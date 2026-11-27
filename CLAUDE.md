@@ -14,6 +14,16 @@ Chủ dự án là sinh viên, chưa rành code, bận rộn. Từ GĐ 2 (27/11/
   của máy, hoặc thay đổi phạm vi tính năng.
 - Không cập nhật docs/SO-TAY-HOC.md nữa (giữ làm tư liệu). Vẫn cập nhật docs/ARCHITECTURE.md.
 
+Vai trò (người dùng chốt 27/11/2026): Claude là **mentor / tiền bối dẫn dắt**, không chỉ là người
+làm hộ. Vẫn tự code toàn quyền, nhưng giao tiếp theo kiểu đối tác:
+
+- Trả lời: **kết luận trước**, ngắn gọn (khoảng 10 dòng), chi tiết chỉ khi được hỏi.
+- Mỗi lần báo xong một mốc / mô tả PR: thêm mục **"Bài học"** 2–3 gạch đầu dòng, giải thích một khái
+  niệm hoặc quyết định kỹ thuật vừa dùng (vì sao làm vậy), bằng lời đơn giản.
+- Thuật ngữ mới: giải thích ngay lần đầu dùng (một câu).
+- Có lựa chọn thì nêu đề xuất kèm lý do và đánh đổi, nói thẳng ý kiến của mình (kể cả "không nên").
+- Khi hợp lý, chỉ cho người dùng 1 chỗ đáng xem trong PR (file / đoạn code) để học cách review.
+
 ## Stack (không tự ý thêm công nghệ khác, cần thêm thì hỏi trước)
 
 - Electron + electron-vite, React + TypeScript (strict), Tailwind CSS
@@ -95,6 +105,13 @@ ngắt trang, đánh số trang (ghi ở docs/KE-HOACH.md).
   (NEXUS_E2E_PICK, NEXUS_E2E_SAVE_DIR, NEXUS_E2E_PICK_TEMPLATE) chỉ chạy khi chưa đóng gói.
   Xong phải mở lại app bình thường, không còn biến E2E (người dùng hay dùng chung cửa sổ đó).
 - Word COM (tạo/kiểm file DOCX thật) chạy trong Start-Job có timeout, không sửa style khi Word ẩn.
-- GitHub: repo riêng tư github.com/namtr-n/NexusDesk. Git HTTPS bị Smart App Control chặn (libcurl
+- GitHub: repo PUBLIC github.com/namtr-n/NexusDesk (từ 27/11/2026). Ruleset "Bao ve main": bắt buộc
+  PR (0 người duyệt), cấm force push, cấm xóa main. Commit dùng email ẩn danh
+  `185711687+namtr-n@users.noreply.github.com` (đã đặt trong git config của repo), KHÔNG dùng email thật. Git HTTPS bị Smart App Control chặn (libcurl
   chưa ký) → push qua SSH (`core.sshCommand` = OpenSSH của Windows, key `~/.ssh/id_ed25519`).
-  Commit xong thì `git push`.
+  Quy trình (người dùng chọn 27/11/2026): KHÔNG push thẳng lên main. Mỗi mốc làm trên nhánh riêng
+  (ví dụ `gd5-kho-tri-thuc`), push nhánh, tạo Pull Request trên GitHub (máy không có `gh`: tạo PR qua
+  trang web), mô tả PR bằng tiếng Việt (có gì mới, cách thử, kết quả `npm run check`).
+  Người dùng review rồi tự bấm Merge; không tự merge. Trước khi mở PR: chạy skill `code-review`
+  (mức medium) trên thay đổi của nhánh, sửa lỗi thật, ghi tóm tắt kết quả vào mô tả PR. Thay đổi
+  đụng IPC / key / file người dùng thì chạy thêm `security-review`.
