@@ -63,26 +63,34 @@ Bản sao tài liệu: `%APPDATA%\Nexus Desk\documents\<uuid>.<kind>`. Xóa tài
 Đường dẫn file do main lấy từ hộp thoại Windows, renderer không bao giờ gửi đường dẫn.
 Kiểm thử tự động khi dev: `NEXUS_E2E_PICK="C:\a.docx|C:\b.pdf"` thay cho hộp thoại (bị bỏ qua khi app.isPackaged).
 
-### Đã có (GĐ 2B)
+### Đã có (GĐ 2B + mẫu định dạng)
 
-| Bảng            | Cột chính                                                                               | Ghi chú                                      |
-| --------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
-| `settings`      | key, value (JSON), updated_at                                                           | `format.rules` = quy tắc định dạng đang dùng |
-| `format_checks` | id, document_id (cascade), checked_at, issue_count, rules_json, stats_json, issues_json | Lưu cả quy tắc lúc kiểm tra để báo cáo đúng  |
+| Bảng               | Cột chính                                                                                                      | Ghi chú                                             |
+| ------------------ | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `settings`         | key, value (JSON), updated_at                                                                                  | Dành cho GĐ 3 (API key). Không còn dùng cho quy tắc |
+| `format_templates` | id, name, is_default, source_name, spec_json (TemplateSpec), learned_json, created/updated                     | Khởi động tự tạo "Chuẩn báo cáo sinh viên"          |
+| `format_checks`    | id, document_id (cascade), template_id (set null), template_name, rules_json (= spec), stats_json, issues_json | Lưu cả spec lúc kiểm tra để báo cáo đúng            |
 
-### Bộ kiểm tra định dạng DOCX (`src/main/services/format/`)
+### Kiểm tra định dạng DOCX theo mẫu (`src/main/services/format/`)
 
+- **Mẫu (TemplateSpec, src/shared/format.ts)**: thông số riêng cho thân bài, Heading 1–4
+  (cấp sâu hơn dùng Heading 4), chú thích; lề trang; thứ tự heading. Mỗi thuộc tính null =
+  không kiểm tra; số dạng khoảng {min,max}. Sai số: 0,05 pt cỡ chữ, 0,05 bội số dòng, 0,5 pt, 0,1 cm.
 - `docx-model.ts`: mở zip, đọc `document.xml`, `styles.xml`, `theme/theme1.xml`; tính định dạng
   hiệu lực theo tầng docDefaults → style (chuỗi basedOn) → pPr/rPr trực tiếp; font theme
-  (minorHAnsi...) tra trong theme. Nhận biết heading (outlineLvl hoặc tên "heading N"), bảng,
-  mục lục (sdt "Table of Contents" / style TOC), danh sách (numPr), section và lề trang.
-- `check.ts`: so với `FormatRules` (src/shared/format.ts). Phân loại đoạn: heading / chú thích
-  (style Caption hoặc "Hình/Bảng N...") / thân bài. Thân bài: cỡ chữ, giãn dòng, cách đoạn;
-  căn đều và thụt dòng chỉ xét đoạn ≥ 80 ký tự, không phải danh sách. Bảng: chỉ xét font.
-  Bỏ qua font ký hiệu (Symbol, Wingdings, Cambria Math) và chỉ số trên/dưới khi xét cỡ chữ.
+  (minorHAnsi...) tra trong theme. Nhận biết heading, bảng, mục lục, danh sách, section, lề.
+- `paragraph-facts.ts`: `classifyAll` phân loại đoạn: heading / chú thích (style Caption,
+  "Hình/Bảng N" ngắn hoặc căn giữa, dòng ngắn căn giữa) / bảng / trang bìa (dòng ngắn trước
+  mục lục hoặc heading đầu tiên) / thân bài. Bảng và trang bìa chỉ xét font.
+- `check.ts`: so từng đoạn với thông số của loại đoạn tương ứng. Thân bài: căn lề và thụt dòng
+  chỉ xét đoạn ≥ 80 ký tự, không phải danh sách. Lỗi lề trang gộp các section giống nhau.
+- `learn.ts`: học mẫu từ DOCX — với mỗi loại đoạn lấy giá trị phổ biến nhất (trọng số theo
+  độ dài chữ); cảnh báo khi < 3 đoạn thân bài, không có heading, hoặc giá trị chiếm < 60%.
+- `template-service.ts`: CRUD mẫu, mặc định, không cho xóa mẫu cuối cùng.
 - `report.ts`: xuất Markdown và DOCX. `format-service.ts`: chặn ghi báo cáo đè file gốc/bản sao.
-- Đã thử với file do Word 365 tạo (theme Aptos, giãn 1,16): file đúng chuẩn 0 lỗi, file mặc định bắt đủ lỗi.
-- Kiểm thử tự động khi dev: `NEXUS_E2E_SAVE_DIR` thay cho hộp thoại "Lưu thành".
+- Đã thử: file Word 365 thật; tình huống "mẫu khách hàng" (Arial 12, 1,15, H1 căn giữa):
+  học đúng, bài làm đúng mẫu 0 lỗi, bài sai mẫu bắt đủ 16 lỗi; báo cáo thật 613 đoạn: 0,12 s.
+- Kiểm thử tự động khi dev: `NEXUS_E2E_SAVE_DIR`, `NEXUS_E2E_PICK_TEMPLATE` thay cho hộp thoại.
 
 ### Dự kiến (tạo khi tới giai đoạn tương ứng)
 

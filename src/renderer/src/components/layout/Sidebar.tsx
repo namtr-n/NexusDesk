@@ -4,12 +4,14 @@ import {
   HomeIcon,
   LibraryIcon,
   PromptIcon,
-  SettingsIcon
+  SettingsIcon,
+  TemplateIcon
 } from '@renderer/components/icons'
 
 const mainItems = [
   { to: '/', label: 'Tổng quan', icon: HomeIcon },
   { to: '/documents', label: 'Tài liệu', icon: DocumentIcon },
+  { to: '/templates', label: 'Mẫu định dạng', icon: TemplateIcon },
   { to: '/knowledge', label: 'Kho tri thức', icon: LibraryIcon },
   { to: '/prompts', label: 'Prompt', icon: PromptIcon }
 ]

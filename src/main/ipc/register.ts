@@ -1,4 +1,6 @@
 import { ipcMain, type IpcMainInvokeEvent } from 'electron'
+import { readFile } from 'fs/promises'
+import { basename } from 'path'
 import { is } from '@electron-toolkit/utils'
 import { z } from 'zod'
 import { IPC } from '@shared/channels'
@@ -8,18 +10,23 @@ import {
   documentImportSchema,
   documentListSchema,
   documentSetProjectSchema,
+  formatCheckSchema,
   formatExportSchema,
   projectCreateSchema,
   projectRemoveSchema,
   projectUpdateSchema,
+  templateIdSchema,
+  templatePresetSchema,
+  templateUpdateSchema,
   type AppInfo,
   type Result
 } from '@shared/ipc-contract'
+import type { ReportFormat } from '@shared/format'
 import { logger } from '../logger'
 import type { ActivityRepository } from '../services/activity/activity-repository'
-import { formatRulesSchema, type ReportFormat } from '@shared/format'
 import type { DocumentService } from '../services/documents/document-service'
 import type { FormatService } from '../services/format/format-service'
+import type { TemplateService } from '../services/format/template-service'
 import type { ProjectService } from '../services/projects/project-service'
 import { createHandler } from './handler'
 
@@ -29,8 +36,11 @@ export interface IpcDependencies {
   documents: DocumentService
   appInfo: () => AppInfo
   format: FormatService
+  templates: TemplateService
   /** Hiện hộp thoại chọn file của Windows; trả [] nếu người dùng bấm Hủy */
   pickDocumentFiles: () => Promise<string[]>
+  /** Hộp thoại chọn MỘT file DOCX mẫu; trả null nếu người dùng bấm Hủy */
+  pickTemplateFile: () => Promise<string | null>
   /** Hiện hộp thoại "Lưu thành"; trả null nếu người dùng bấm Hủy */
   pickSavePath: (defaultName: string, format: ReportFormat) => Promise<string | null>
 }
@@ -85,10 +95,12 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     deps.documents.setProject(input.id, input.projectId)
   )
 
-  register(IPC.format.getRules, noInput, () => deps.format.getRules())
-  register(IPC.format.saveRules, formatRulesSchema, (rules) => deps.format.saveRules(rules))
-  register(IPC.format.resetRules, noInput, () => deps.format.resetRules())
-  register(IPC.format.check, documentIdSchema, (input) => deps.format.check(input.id))
+  register(IPC.format.check, formatCheckSchema, (input) =>
+    deps.format.check(input.id, input.templateId)
+  )
+  register(IPC.format.createTemplateFromDocument, documentIdSchema, (input) =>
+    deps.format.createTemplateFromDocument(input.id)
+  )
   register(IPC.format.getLatest, documentIdSchema, (input) => deps.format.getLatest(input.id))
   register(IPC.format.exportReport, formatExportSchema, async ({ documentId, format }) => {
     const name = deps.format.suggestReportName(documentId, format)
@@ -97,4 +109,23 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     const path = await deps.format.exportReport(documentId, format, target)
     return { cancelled: false, path }
   })
+
+  register(IPC.templates.list, noInput, () => deps.templates.list())
+  register(IPC.templates.get, templateIdSchema, (input) => deps.templates.get(input.id))
+  register(IPC.templates.createFromPreset, templatePresetSchema, (input) =>
+    deps.templates.createFromPreset(input.name)
+  )
+  register(IPC.templates.createFromFile, noInput, async () => {
+    const path = await deps.pickTemplateFile()
+    if (!path) return { cancelled: true, template: null }
+    const data = await readFile(path)
+    return { cancelled: false, template: await deps.templates.createFromDocx(data, basename(path)) }
+  })
+  register(IPC.templates.update, templateUpdateSchema, (input) =>
+    deps.templates.update(input.id, input.name, input.spec)
+  )
+  register(IPC.templates.setDefault, templateIdSchema, (input) =>
+    deps.templates.setDefault(input.id)
+  )
+  register(IPC.templates.remove, templateIdSchema, (input) => deps.templates.remove(input.id))
 }

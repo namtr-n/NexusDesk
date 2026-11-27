@@ -3,13 +3,13 @@ import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { openDatabase } from './db/client'
-import { pickDocumentFiles, pickSavePath } from './dialogs'
+import { pickDocumentFiles, pickSavePath, pickTemplateFile } from './dialogs'
 import { registerIpcHandlers } from './ipc/register'
 import { getLogFilePath, logger } from './logger'
 import { createActivityRepository } from './services/activity/activity-repository'
 import { createDocumentService } from './services/documents/document-service'
 import { createFormatService } from './services/format/format-service'
-import { createSettingsStore } from './services/settings/settings-store'
+import { createTemplateService } from './services/format/template-service'
 import { createProjectService } from './services/projects/project-service'
 import { createMainWindow } from './window'
 
@@ -45,15 +45,18 @@ function bootstrap(): boolean {
     const storageDir = join(dataPath, 'documents')
     mkdirSync(storageDir, { recursive: true })
     const documents = createDocumentService({ db: database.db, activity, storageDir, logger })
-    const settings = createSettingsStore(database.db)
-    const format = createFormatService({ db: database.db, documents, settings, activity, logger })
+    const templates = createTemplateService(database.db)
+    templates.ensureDefault()
+    const format = createFormatService({ db: database.db, documents, templates, activity, logger })
 
     registerIpcHandlers({
       projects,
       activity,
       documents,
       format,
+      templates,
       pickDocumentFiles,
+      pickTemplateFile,
       pickSavePath,
       appInfo: () => ({
         version: app.getVersion(),

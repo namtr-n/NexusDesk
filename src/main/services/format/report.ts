@@ -13,26 +13,12 @@ import {
   WidthType
 } from 'docx'
 import {
+  describeSpec,
   FORMAT_RULE_LABELS,
   groupIssues,
   type FormatCheckResult,
-  type FormatIssue,
-  type FormatRules
+  type FormatIssue
 } from '@shared/format'
-
-const n = (v: number): string => v.toLocaleString('vi-VN', { maximumFractionDigits: 2 })
-
-export function describeRules(r: FormatRules): string[] {
-  return [
-    `Font: ${r.fontFamily}, cỡ chữ thân bài ${n(r.bodyFontSizePt)} pt`,
-    `Giãn dòng: ${n(r.lineSpacing)} dòng`,
-    `Khoảng cách trước đoạn: ${n(r.spaceBeforePt.min)}–${n(r.spaceBeforePt.max)} pt; sau đoạn: ${n(r.spaceAfterPt.min)}–${n(r.spaceAfterPt.max)} pt`,
-    `Căn đều hai bên: ${r.justifyBody ? 'có' : 'không kiểm tra'}`,
-    `Thụt đầu dòng: ${r.firstLineIndentCm ? `${n(r.firstLineIndentCm.min)}–${n(r.firstLineIndentCm.max)} cm` : 'không kiểm tra'}`,
-    `Lề trang: trên ${n(r.marginsCm.top)}, dưới ${n(r.marginsCm.bottom)}, trái ${n(r.marginsCm.left)}, phải ${n(r.marginsCm.right)} cm`,
-    `Thứ tự heading: ${r.checkHeadingOrder ? 'có kiểm tra' : 'không kiểm tra'}`
-  ]
-}
 
 const dateText = (ms: number): string =>
   new Date(ms).toLocaleString('vi-VN', {
@@ -43,7 +29,8 @@ const dateText = (ms: number): string =>
     minute: '2-digit'
   })
 
-const where = (i: FormatIssue): string => (i.paragraph === null ? i.excerpt : `Đoạn ${i.paragraph}`)
+const where = (i: FormatIssue): string =>
+  i.paragraph === null ? i.excerpt : `Đoạn ${i.paragraph} (${i.context})`
 
 export function buildMarkdown(documentName: string, result: FormatCheckResult): string {
   const esc = (s: string): string => s.replace(/\|/g, '\\|')
@@ -51,13 +38,14 @@ export function buildMarkdown(documentName: string, result: FormatCheckResult): 
     `# Báo cáo kiểm tra định dạng`,
     '',
     `- **Tài liệu:** ${documentName}`,
+    `- **Mẫu định dạng:** ${result.templateName}`,
     `- **Thời điểm kiểm tra:** ${dateText(result.checkedAt)}`,
     `- **Số đoạn có chữ:** ${result.stats.paragraphs} (thân bài ${result.stats.bodyParagraphs}, heading ${result.stats.headings})`,
     `- **Tổng số lỗi:** ${result.issues.length}`,
     '',
-    '## Quy tắc áp dụng',
+    '## Thông số của mẫu',
     '',
-    ...describeRules(result.rules).map((l) => `- ${l}`),
+    ...describeSpec(result.spec).map((l) => `- ${l}`),
     ''
   ]
   if (result.issues.length === 0) {
@@ -123,13 +111,17 @@ export async function buildReportDocx(
       children: [new TextRun({ text: 'BÁO CÁO KIỂM TRA ĐỊNH DẠNG', bold: true, size: 32 })]
     }),
     para(`Tài liệu: ${documentName}`),
+    para(`Mẫu định dạng: ${result.templateName}`),
     para(`Thời điểm kiểm tra: ${dateText(result.checkedAt)}`),
     para(
       `Số đoạn có chữ: ${result.stats.paragraphs} (thân bài ${result.stats.bodyParagraphs}, heading ${result.stats.headings})`
     ),
     para(`Tổng số lỗi: ${result.issues.length}`, true),
-    new Paragraph({ heading: HeadingLevel.HEADING_1, children: [new TextRun('Quy tắc áp dụng')] }),
-    ...describeRules(result.rules).map(
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      children: [new TextRun('Thông số của mẫu')]
+    }),
+    ...describeSpec(result.spec).map(
       (l) => new Paragraph({ bullet: { level: 0 }, children: [new TextRun(l)] })
     )
   ]
@@ -155,7 +147,7 @@ export async function buildReportDocx(
         table(
           ['Vị trí', 'Nội dung đầu đoạn', 'Hiện tại', 'Yêu cầu'],
           list.map((i) => [where(i), i.paragraph === null ? '' : i.excerpt, i.actual, i.expected]),
-          [12, 44, 22, 22]
+          [18, 38, 22, 22]
         )
       )
     }

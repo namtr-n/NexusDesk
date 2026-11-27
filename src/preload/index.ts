@@ -25,12 +25,20 @@ const api: NexusApi = {
     setProject: (input) => ipcRenderer.invoke(IPC.documents.setProject, input)
   },
   format: {
-    getRules: () => ipcRenderer.invoke(IPC.format.getRules),
-    saveRules: (input) => ipcRenderer.invoke(IPC.format.saveRules, input),
-    resetRules: () => ipcRenderer.invoke(IPC.format.resetRules),
     check: (input) => ipcRenderer.invoke(IPC.format.check, input),
     getLatest: (input) => ipcRenderer.invoke(IPC.format.getLatest, input),
-    exportReport: (input) => ipcRenderer.invoke(IPC.format.exportReport, input)
+    exportReport: (input) => ipcRenderer.invoke(IPC.format.exportReport, input),
+    createTemplateFromDocument: (input) =>
+      ipcRenderer.invoke(IPC.format.createTemplateFromDocument, input)
+  },
+  templates: {
+    list: () => ipcRenderer.invoke(IPC.templates.list),
+    get: (input) => ipcRenderer.invoke(IPC.templates.get, input),
+    createFromPreset: (input) => ipcRenderer.invoke(IPC.templates.createFromPreset, input),
+    createFromFile: () => ipcRenderer.invoke(IPC.templates.createFromFile),
+    update: (input) => ipcRenderer.invoke(IPC.templates.update, input),
+    setDefault: (input) => ipcRenderer.invoke(IPC.templates.setDefault, input),
+    remove: (input) => ipcRenderer.invoke(IPC.templates.remove, input)
   }
 }
 

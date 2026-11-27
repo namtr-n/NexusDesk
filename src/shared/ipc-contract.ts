@@ -5,7 +5,13 @@
  * - Kiểu dữ liệu trả về và interface NexusApi (window.nexus).
  */
 import { z } from 'zod'
-import type { FormatCheckResult, FormatRules } from './format'
+import {
+  templateNameSchema,
+  templateSpecSchema,
+  type FormatCheckResult,
+  type FormatTemplate,
+  type FormatTemplateSummary
+} from './format'
 
 /** Mọi lời gọi IPC đều trả về dạng này: thành công kèm data, hoặc thất bại kèm thông báo lỗi. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -141,6 +147,31 @@ export interface ExportResult {
   path: string | null
 }
 
+export const formatCheckSchema = z.object({
+  id: entityId,
+  templateId: z.union([entityId, z.null()]).optional()
+})
+export type FormatCheckInput = z.input<typeof formatCheckSchema>
+
+// ---------- Mẫu định dạng ----------
+
+export const templateIdSchema = z.object({ id: entityId })
+export const templatePresetSchema = z.object({ name: templateNameSchema })
+export const templateUpdateSchema = z.object({
+  id: entityId,
+  name: templateNameSchema,
+  spec: templateSpecSchema
+})
+
+export type TemplateIdInput = z.input<typeof templateIdSchema>
+export type TemplatePresetInput = z.input<typeof templatePresetSchema>
+export type TemplateUpdateInput = z.input<typeof templateUpdateSchema>
+
+export interface TemplateFromFileResult {
+  cancelled: boolean
+  template: FormatTemplate | null
+}
+
 // ---------- Thông tin app ----------
 
 export interface AppInfo {
@@ -174,12 +205,22 @@ export interface NexusApi {
     setProject(input: DocumentSetProjectInput): Promise<Result<DocumentSummary>>
   }
   format: {
-    getRules(): Promise<Result<FormatRules>>
-    saveRules(input: FormatRules): Promise<Result<FormatRules>>
-    resetRules(): Promise<Result<FormatRules>>
-    check(input: DocumentIdInput): Promise<Result<FormatCheckResult>>
+    /** Kiểm tra theo mẫu; bỏ trống templateId = mẫu mặc định */
+    check(input: FormatCheckInput): Promise<Result<FormatCheckResult>>
     getLatest(input: DocumentIdInput): Promise<Result<FormatCheckResult | null>>
     /** Mở hộp thoại "Lưu thành" (do main hiện) rồi ghi báo cáo */
     exportReport(input: FormatExportInput): Promise<Result<ExportResult>>
+    /** Học mẫu định dạng từ một tài liệu DOCX trong thư viện */
+    createTemplateFromDocument(input: DocumentIdInput): Promise<Result<FormatTemplate>>
+  }
+  templates: {
+    list(): Promise<Result<FormatTemplateSummary[]>>
+    get(input: TemplateIdInput): Promise<Result<FormatTemplate>>
+    createFromPreset(input: TemplatePresetInput): Promise<Result<FormatTemplate>>
+    /** Mở hộp thoại chọn file DOCX mẫu (do main hiện) rồi học mẫu */
+    createFromFile(): Promise<Result<TemplateFromFileResult>>
+    update(input: TemplateUpdateInput): Promise<Result<FormatTemplate>>
+    setDefault(input: TemplateIdInput): Promise<Result<FormatTemplate>>
+    remove(input: TemplateIdInput): Promise<Result<{ id: number }>>
   }
 }

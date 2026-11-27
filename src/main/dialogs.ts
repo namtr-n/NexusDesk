@@ -34,6 +34,22 @@ export async function pickDocumentFiles(): Promise<string[]> {
   return result.canceled ? [] : result.filePaths
 }
 
+export async function pickTemplateFile(): Promise<string | null> {
+  const fake = e2e('NEXUS_E2E_PICK_TEMPLATE')
+  if (fake) return fake
+
+  const options: OpenDialogOptions = {
+    title: 'Chọn file DOCX mẫu',
+    properties: ['openFile'],
+    filters: [{ name: 'Word (DOCX)', extensions: ['docx'] }]
+  }
+  const win = BrowserWindow.getFocusedWindow()
+  const result = win
+    ? await dialog.showOpenDialog(win, options)
+    : await dialog.showOpenDialog(options)
+  return result.canceled ? null : (result.filePaths[0] ?? null)
+}
+
 const SAVE_FILTERS: Record<ReportFormat, { name: string; extensions: string[] }> = {
   docx: { name: 'Word (DOCX)', extensions: ['docx'] },
   md: { name: 'Markdown', extensions: ['md'] }

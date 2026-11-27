@@ -23,11 +23,18 @@ export const IPC = {
     setProject: 'documents:set-project'
   },
   format: {
-    getRules: 'format:get-rules',
-    saveRules: 'format:save-rules',
-    resetRules: 'format:reset-rules',
     check: 'format:check',
     getLatest: 'format:get-latest',
-    exportReport: 'format:export-report'
+    exportReport: 'format:export-report',
+    createTemplateFromDocument: 'format:create-template-from-document'
+  },
+  templates: {
+    list: 'templates:list',
+    get: 'templates:get',
+    createFromPreset: 'templates:create-from-preset',
+    createFromFile: 'templates:create-from-file',
+    update: 'templates:update',
+    setDefault: 'templates:set-default',
+    remove: 'templates:remove'
   }
 } as const

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from 'fs/promises'
 import { tmpdir } from 'os'
 import { join } from 'path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_FORMAT_RULES } from '@shared/format'
+import { DEFAULT_TEMPLATE_NAME, DEFAULT_TEMPLATE_SPEC, EMPTY_CATEGORY } from '@shared/format'
 import type { DatabaseHandle } from '../../src/main/db/client'
 import { UserError } from '../../src/main/errors'
 import { createActivityRepository } from '../../src/main/services/activity/activity-repository'
@@ -15,13 +15,17 @@ import {
   createFormatService,
   type FormatService
 } from '../../src/main/services/format/format-service'
-import { createSettingsStore } from '../../src/main/services/settings/settings-store'
+import {
+  createTemplateService,
+  type TemplateService
+} from '../../src/main/services/format/template-service'
 import { buildDocx, LONG, p, SECT_OK } from './docx-builder'
 import { createTestDatabase } from './test-db'
 
-describe('FormatService', () => {
+describe('TemplateService + FormatService', () => {
   let database: DatabaseHandle
   let docs: DocumentService
+  let templates: TemplateService
   let format: FormatService
   let root: string
   let userDir: string
@@ -40,13 +44,9 @@ describe('FormatService', () => {
       storageDir: join(root, 'storage'),
       logger
     })
-    format = createFormatService({
-      db: database.db,
-      documents: docs,
-      settings: createSettingsStore(database.db),
-      activity,
-      logger
-    })
+    templates = createTemplateService(database.db)
+    templates.ensureDefault()
+    format = createFormatService({ db: database.db, documents: docs, templates, activity, logger })
   })
 
   afterEach(async () => {
@@ -61,35 +61,59 @@ describe('FormatService', () => {
     return r.imported[0].id
   }
 
-  it('quy tắc: mặc định → lưu → đọc lại → khôi phục mặc định', () => {
-    expect(format.getRules()).toEqual(DEFAULT_FORMAT_RULES)
-    const custom = { ...DEFAULT_FORMAT_RULES, fontFamily: 'Arial', bodyFontSizePt: 12 }
-    format.saveRules(custom)
-    expect(format.getRules()).toEqual(custom)
-    expect(format.resetRules()).toEqual(DEFAULT_FORMAT_RULES)
-    expect(format.getRules()).toEqual(DEFAULT_FORMAT_RULES)
+  it('khởi động: tạo đúng 1 mẫu mặc định, gọi lại không tạo thêm', () => {
+    templates.ensureDefault()
+    const list = templates.list()
+    expect(list).toHaveLength(1)
+    expect(list[0]).toMatchObject({ name: DEFAULT_TEMPLATE_NAME, isDefault: true })
+    expect(templates.getDefault().spec).toEqual(DEFAULT_TEMPLATE_SPEC)
   })
 
-  it('kiểm tra theo quy tắc đang lưu, lưu kết quả, getLatest trả lần mới nhất', async () => {
+  it('tạo, sửa, đặt mặc định, xóa mẫu', () => {
+    const t = templates.createFromPreset('Khách A')
+    const spec = { ...DEFAULT_TEMPLATE_SPEC, body: { ...EMPTY_CATEGORY, fontFamily: 'Arial' } }
+    expect(templates.update(t.id, 'Khách A (sửa)', spec)).toMatchObject({
+      name: 'Khách A (sửa)',
+      spec
+    })
+
+    templates.setDefault(t.id)
+    expect(templates.getDefault().id).toBe(t.id)
+    expect(templates.list().filter((x) => x.isDefault)).toHaveLength(1)
+
+    templates.remove(t.id)
+    expect(templates.getDefault().name).toBe(DEFAULT_TEMPLATE_NAME)
+    expect(() => templates.remove(templates.getDefault().id)).toThrow(UserError)
+  })
+
+  it('học mẫu từ file DOCX, tên mặc định theo tên file', async () => {
+    const data = await buildDocx(p(LONG, { style: 'BaoCao' }).repeat(3) + SECT_OK)
+    const t = await templates.createFromDocx(data, 'Mau khach.docx')
+    expect(t.name).toBe('Mẫu: Mau khach')
+    expect(t.sourceName).toBe('Mau khach.docx')
+    expect(t.learned?.bodyParagraphs).toBe(3)
+    expect(t.spec.body.fontFamily).toBe('Times New Roman')
+    await expect(templates.createFromDocx(Buffer.from('rác'), 'x.docx')).rejects.toThrow(UserError)
+  })
+
+  it('kiểm tra theo mẫu mặc định hoặc mẫu chọn; lưu tên mẫu vào kết quả', async () => {
     const id = await importDocx('a.docx', p(LONG) + SECT_OK)
     expect(format.getLatest(id)).toBeNull()
 
     const first = await format.check(id)
+    expect(first.templateName).toBe(DEFAULT_TEMPLATE_NAME)
     expect(first.issues.length).toBeGreaterThan(0)
 
-    format.saveRules({
-      ...DEFAULT_FORMAT_RULES,
-      fontFamily: 'Calibri',
-      bodyFontSizePt: 11,
-      lineSpacing: 1.08,
-      justifyBody: false,
-      firstLineIndentCm: null,
-      spaceAfterPt: { min: 0, max: 12 }
-    })
-    const second = await format.check(id)
+    // Học mẫu từ chính tài liệu này → kiểm tra theo mẫu đó: 0 lỗi
+    const learned = await format.createTemplateFromDocument(id)
+    const second = await format.check(id, learned.id)
     expect(second.issues).toEqual([])
-    expect(second.rules.fontFamily).toBe('Calibri')
+    expect(second.templateName).toBe(learned.name)
     expect(format.getLatest(id)).toEqual(second)
+
+    // Xóa mẫu: lịch sử kiểm tra vẫn còn (templateId về null)
+    templates.remove(learned.id)
+    expect(format.getLatest(id)).toMatchObject({ templateId: null, templateName: learned.name })
   })
 
   it('không phải DOCX: báo lỗi dễ hiểu', async () => {
@@ -97,9 +121,10 @@ describe('FormatService', () => {
     await writeFile(path, 'abc')
     const { imported } = await docs.importFiles([path], null)
     await expect(format.check(imported[0].id)).rejects.toThrow(UserError)
+    await expect(format.createTemplateFromDocument(imported[0].id)).rejects.toThrow(UserError)
   })
 
-  it('xuất báo cáo Markdown và DOCX', async () => {
+  it('xuất báo cáo Markdown và DOCX có tên mẫu', async () => {
     const id = await importDocx('Bao cao.docx', p(LONG) + SECT_OK)
     await expect(format.exportReport(id, 'md', join(root, 'x.md'))).rejects.toThrow('Kiểm tra')
     await format.check(id)
@@ -108,15 +133,16 @@ describe('FormatService', () => {
 
     const md = await readFile(await format.exportReport(id, 'md', join(root, 'r.md')), 'utf8')
     expect(md).toContain('# Báo cáo kiểm tra định dạng')
+    expect(md).toContain(`**Mẫu định dạng:** ${DEFAULT_TEMPLATE_NAME}`)
     expect(md).toContain('| Font chữ | 1 |')
-    expect(md).toContain('Calibri')
+    expect(md).toContain('Đoạn 1 (Thân bài)')
 
     const docxPath = await format.exportReport(id, 'docx', join(root, 'r.docx'))
     const report = await loadDocx(await readFile(docxPath))
     const text = report.paragraphs.map((x) => x.text).join('\n')
     expect(text).toContain('BÁO CÁO KIỂM TRA ĐỊNH DẠNG')
     expect(text).toContain('Bao cao.docx')
-    expect(text).toContain('Times New Roman')
+    expect(text).toContain(DEFAULT_TEMPLATE_NAME)
   })
 
   it('không bao giờ ghi báo cáo đè lên file gốc hoặc bản sao', async () => {

@@ -32,6 +32,13 @@ export const DocumentIcon = (p: IconProps) => (
   </Svg>
 )
 
+export const TemplateIcon = (p: IconProps) => (
+  <Svg {...p}>
+    <rect x="4" y="3" width="16" height="18" rx="1.5" />
+    <path d="M8 7h8M8 11h8M8 15h5" />
+  </Svg>
+)
+
 export const LibraryIcon = (p: IconProps) => (
   <Svg {...p}>
     <path d="M4 19.5V5a2 2 0 0 1 2-2h13v15H6a2 2 0 0 0-2 2.5Z" />

@@ -22,6 +22,13 @@
       "when": 1795773221679,
       "tag": "0002_format_checks",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1795774770846,
+      "tag": "0003_templates",
+      "breakpoints": true
     }
   ]
 }

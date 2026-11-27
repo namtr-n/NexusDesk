@@ -48,6 +48,7 @@ export interface DocxRun {
   text: string
   font: string | undefined
   sizePt: number | undefined
+  bold: boolean
   vertAlign: string | undefined
 }
 
@@ -331,6 +332,7 @@ export async function loadDocx(data: Buffer): Promise<DocxModel> {
         text,
         font: resolveFont(eff),
         sizePt: eff.sizeHalfPt !== undefined ? eff.sizeHalfPt / 2 : undefined,
+        bold: eff.bold === true,
         vertAlign: eff.vertAlign
       }
     })

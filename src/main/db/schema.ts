@@ -60,7 +60,21 @@ export const settings = sqliteTable('settings', {
   updatedAt: integer('updated_at').notNull()
 })
 
-/** Mỗi lần kiểm tra định dạng một tài liệu (lưu cả quy tắc lúc kiểm tra để xuất báo cáo đúng). */
+/** Mẫu định dạng: thông số mong muốn cho từng loại đoạn (spec_json = TemplateSpec). */
+export const formatTemplates = sqliteTable('format_templates', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  name: text('name').notNull(),
+  isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false),
+  /** Tên file mẫu đã dùng để học (null nếu tạo tay / mẫu có sẵn) */
+  sourceName: text('source_name'),
+  specJson: text('spec_json').notNull(),
+  /** TemplateLearnInfo: số đoạn đã học, cảnh báo */
+  learnedJson: text('learned_json'),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull()
+})
+
+/** Mỗi lần kiểm tra định dạng một tài liệu (lưu cả mẫu lúc kiểm tra để xuất báo cáo đúng). */
 export const formatChecks = sqliteTable(
   'format_checks',
   {
@@ -70,7 +84,12 @@ export const formatChecks = sqliteTable(
       .references(() => documents.id, { onDelete: 'cascade' }),
     checkedAt: integer('checked_at').notNull(),
     issueCount: integer('issue_count').notNull(),
-    rulesJson: text('rules_json').notNull(),
+    templateId: integer('template_id').references(() => formatTemplates.id, {
+      onDelete: 'set null'
+    }),
+    templateName: text('template_name'),
+    /** TemplateSpec dùng lúc kiểm tra (tên cột cũ giữ nguyên) */
+    specJson: text('rules_json').notNull(),
     statsJson: text('stats_json').notNull(),
     issuesJson: text('issues_json').notNull()
   },

@@ -2,7 +2,6 @@ import { ErrorBanner, Loading, PageHeader, Panel } from '@renderer/components/ui
 import { SettingsIcon } from '@renderer/components/icons'
 import { useAsyncData } from '@renderer/hooks/useAsyncData'
 import { unwrap } from '@renderer/lib/api'
-import { FormatRulesPanel } from './FormatRulesPanel'
 
 const loadInfo = () => unwrap(window.nexus.app.getInfo())
 
@@ -22,10 +21,9 @@ export function SettingsPage() {
     <>
       <PageHeader
         title="Cài đặt"
-        subtitle="Quy tắc định dạng, thông tin ứng dụng và nơi lưu dữ liệu."
+        subtitle="Thông tin ứng dụng và nơi lưu dữ liệu. Quy định trình bày nằm ở trang Mẫu định dạng."
       />
       <div className="space-y-5">
-        <FormatRulesPanel />
         <Panel title="Ứng dụng" icon={<SettingsIcon />}>
           {info.status === 'loading' && <Loading />}
           {info.status === 'error' && <ErrorBanner message={info.error} />}

@@ -1,53 +1,40 @@
 import { readFile, writeFile } from 'fs/promises'
 import { resolve } from 'path'
 import { desc, eq } from 'drizzle-orm'
-import {
-  DEFAULT_FORMAT_RULES,
-  formatRulesSchema,
-  type FormatCheckResult,
-  type FormatRules,
-  type ReportFormat
-} from '@shared/format'
+import { templateSpecSchema, type FormatCheckResult, type ReportFormat } from '@shared/format'
 import type { AppDatabase } from '../../db/client'
 import { formatChecks } from '../../db/schema'
 import { UserError } from '../../errors'
 import type { ErrorLogger } from '../../ipc/handler'
 import type { ActivityRepository } from '../activity/activity-repository'
 import type { DocumentService } from '../documents/document-service'
-import type { SettingsStore } from '../settings/settings-store'
 import { checkFormat } from './check'
 import { loadDocx } from './docx-model'
 import { buildMarkdown, buildReportDocx } from './report'
-
-const RULES_KEY = 'format.rules'
+import type { TemplateService } from './template-service'
 
 export interface FormatService {
-  getRules(): FormatRules
-  saveRules(rules: FormatRules): FormatRules
-  resetRules(): FormatRules
-  check(documentId: number): Promise<FormatCheckResult>
+  /** Kiểm tra theo mẫu đã chọn; không truyền templateId = dùng mẫu mặc định */
+  check(documentId: number, templateId?: number | null): Promise<FormatCheckResult>
   getLatest(documentId: number): FormatCheckResult | null
   /** Ghi báo cáo của lần kiểm tra gần nhất ra file (đường dẫn do main chọn qua hộp thoại) */
   exportReport(documentId: number, format: ReportFormat, targetPath: string): Promise<string>
   /** Tên file gợi ý cho báo cáo */
   suggestReportName(documentId: number, format: ReportFormat): string
+  /** Học mẫu từ một tài liệu DOCX đã có trong thư viện */
+  createTemplateFromDocument(documentId: number): ReturnType<TemplateService['createFromDocx']>
 }
 
 export interface FormatServiceDeps {
   db: AppDatabase
   documents: DocumentService
-  settings: SettingsStore
+  templates: TemplateService
   activity: ActivityRepository
   logger: ErrorLogger
 }
 
 export function createFormatService(deps: FormatServiceDeps): FormatService {
-  const { db, documents, settings, activity, logger } = deps
-
-  function getRules(): FormatRules {
-    const parsed = formatRulesSchema.safeParse(settings.getJson(RULES_KEY))
-    return parsed.success ? parsed.data : DEFAULT_FORMAT_RULES
-  }
+  const { db, documents, templates, activity, logger } = deps
 
   function getLatest(documentId: number): FormatCheckResult | null {
     const row = db
@@ -58,35 +45,35 @@ export function createFormatService(deps: FormatServiceDeps): FormatService {
       .limit(1)
       .get()
     if (!row) return null
+    // Kết quả từ phiên bản cũ (trước khi có mẫu) không đọc được → coi như chưa kiểm tra
+    const spec = templateSpecSchema.safeParse(JSON.parse(row.specJson))
+    if (!spec.success) return null
     return {
       id: row.id,
       documentId: row.documentId,
       checkedAt: row.checkedAt,
-      rules: JSON.parse(row.rulesJson),
+      templateId: row.templateId,
+      templateName: row.templateName ?? 'Không rõ',
+      spec: spec.data,
       stats: JSON.parse(row.statsJson),
       issues: JSON.parse(row.issuesJson)
     }
   }
 
+  async function readDocxOf(documentId: number): Promise<{ data: Buffer; name: string }> {
+    const doc = documents.getSummary(documentId)
+    if (doc.kind !== 'docx') throw new UserError('Chỉ dùng được file DOCX.')
+    return { data: await readFile(documents.getStoredPath(documentId)), name: doc.name }
+  }
+
   return {
-    getRules,
-
-    saveRules(rules) {
-      const valid = formatRulesSchema.parse(rules)
-      settings.setJson(RULES_KEY, valid)
-      return valid
-    },
-
-    resetRules() {
-      settings.remove(RULES_KEY)
-      return DEFAULT_FORMAT_RULES
-    },
-
-    async check(documentId) {
+    async check(documentId, templateId) {
       const doc = documents.getSummary(documentId)
-      if (doc.kind !== 'docx') throw new UserError('Chỉ kiểm tra định dạng được file DOCX.')
-
-      const data = await readFile(documents.getStoredPath(documentId))
+      const template =
+        templateId === undefined || templateId === null
+          ? templates.getDefault()
+          : templates.get(templateId)
+      const { data } = await readDocxOf(documentId)
       let model
       try {
         model = await loadDocx(data)
@@ -95,8 +82,7 @@ export function createFormatService(deps: FormatServiceDeps): FormatService {
         throw new UserError('Không đọc được cấu trúc file DOCX (file có thể bị hỏng).')
       }
 
-      const rules = getRules()
-      const { stats, issues } = checkFormat(model, rules)
+      const { stats, issues } = checkFormat(model, template.spec)
       const checkedAt = Date.now()
 
       return db.transaction(() => {
@@ -106,7 +92,9 @@ export function createFormatService(deps: FormatServiceDeps): FormatService {
             documentId,
             checkedAt,
             issueCount: issues.length,
-            rulesJson: JSON.stringify(rules),
+            templateId: template.id,
+            templateName: template.name,
+            specJson: JSON.stringify(template.spec),
             statsJson: JSON.stringify(stats),
             issuesJson: JSON.stringify(issues)
           })
@@ -114,10 +102,19 @@ export function createFormatService(deps: FormatServiceDeps): FormatService {
           .get()
         activity.log({
           type: 'format.checked',
-          message: `Kiểm tra định dạng "${doc.name}": ${issues.length === 0 ? 'không có lỗi' : `${issues.length} lỗi`}`,
+          message: `Kiểm tra "${doc.name}" theo mẫu "${template.name}": ${issues.length === 0 ? 'không có lỗi' : `${issues.length} lỗi`}`,
           projectId: doc.projectId
         })
-        return { id: row.id, documentId, checkedAt, rules, stats, issues }
+        return {
+          id: row.id,
+          documentId,
+          checkedAt,
+          templateId: template.id,
+          templateName: template.name,
+          spec: template.spec,
+          stats,
+          issues
+        }
       })
     },
 
@@ -149,6 +146,11 @@ export function createFormatService(deps: FormatServiceDeps): FormatService {
     suggestReportName(documentId, format) {
       const base = documents.getSummary(documentId).name.replace(/\.docx$/i, '')
       return `${base} - bao cao dinh dang.${format}`
+    },
+
+    async createTemplateFromDocument(documentId) {
+      const { data, name } = await readDocxOf(documentId)
+      return templates.createFromDocx(data, name)
     }
   }
 }

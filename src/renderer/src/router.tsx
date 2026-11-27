@@ -4,6 +4,7 @@ import { ComingSoonPage } from '@renderer/pages/ComingSoonPage'
 import { DashboardPage } from '@renderer/pages/Dashboard/DashboardPage'
 import { DocumentsPage } from '@renderer/pages/Documents/DocumentsPage'
 import { SettingsPage } from '@renderer/pages/Settings/SettingsPage'
+import { TemplatesPage } from '@renderer/pages/Templates/TemplatesPage'
 
 // Hash router (#/documents...) vì app chạy từ file trên máy, không có web server.
 export const router = createHashRouter([
@@ -13,6 +14,7 @@ export const router = createHashRouter([
     children: [
       { index: true, element: <DashboardPage /> },
       { path: 'documents', element: <DocumentsPage /> },
+      { path: 'templates', element: <TemplatesPage /> },
       {
         path: 'knowledge',
         element: (

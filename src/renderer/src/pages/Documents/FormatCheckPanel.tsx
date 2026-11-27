@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import {
   FORMAT_RULE_LABELS,
   groupIssues,
@@ -7,13 +7,15 @@ import {
   type FormatIssue,
   type ReportFormat
 } from '@shared/format'
-import { Button, ErrorBanner, InfoBanner, Loading } from '@renderer/components/ui'
+import { Button, ErrorBanner, InfoBanner, Loading, Select } from '@renderer/components/ui'
 import { useAsyncData } from '@renderer/hooks/useAsyncData'
 import { errorMessage, unwrap } from '@renderer/lib/api'
-import { formatDateTime, formatNumber } from '@renderer/lib/format'
+import { formatDateTime } from '@renderer/lib/format'
 
 /** Số dòng hiển thị mỗi nhóm trước khi bấm "Xem thêm" */
 const PAGE = 20
+
+const loadTemplates = () => unwrap(window.nexus.templates.list())
 
 export function FormatCheckPanel({ documentId }: { documentId: number }) {
   const load = useCallback(
@@ -21,24 +23,47 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
     [documentId]
   )
   const latest = useAsyncData(load)
+  const templates = useAsyncData(loadTemplates)
   const [result, setResult] = useState<FormatCheckResult | null | undefined>(undefined)
-  const [busy, setBusy] = useState<'check' | ReportFormat | null>(null)
+  const [busy, setBusy] = useState<'check' | 'template' | ReportFormat | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [chosen, setChosen] = useState<number | null>(null)
+  const navigate = useNavigate()
 
   // Kết quả mới vừa kiểm tra ưu tiên hơn kết quả đã lưu
   const current =
     result !== undefined ? result : latest.status === 'ready' ? latest.data : undefined
+
+  const templateList = templates.status === 'ready' ? templates.data : []
+  // Mẫu đang chọn: người dùng chọn > mẫu của lần kiểm tra trước > mẫu mặc định
+  const templateId =
+    chosen ??
+    (current?.templateId && templateList.some((t) => t.id === current.templateId)
+      ? current.templateId
+      : (templateList.find((t) => t.isDefault)?.id ?? null))
 
   async function runCheck() {
     setBusy('check')
     setError(null)
     setSaved(null)
     try {
-      setResult(await unwrap(window.nexus.format.check({ id: documentId })))
+      setResult(await unwrap(window.nexus.format.check({ id: documentId, templateId })))
     } catch (err) {
       setError(errorMessage(err))
     } finally {
+      setBusy(null)
+    }
+  }
+
+  async function useAsTemplate() {
+    setBusy('template')
+    setError(null)
+    try {
+      const t = await unwrap(window.nexus.format.createTemplateFromDocument({ id: documentId }))
+      navigate(`/templates?id=${t.id}`)
+    } catch (err) {
+      setError(errorMessage(err))
       setBusy(null)
     }
   }
@@ -62,9 +87,30 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
   return (
     <div>
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="primary" onClick={runCheck} disabled={busy !== null}>
-          {busy === 'check' ? 'Đang kiểm tra…' : current ? 'Kiểm tra lại' : 'Kiểm tra định dạng'}
+        <span className="text-[12px] text-muted">Theo mẫu</span>
+        <Select
+          value={templateId === null ? '' : String(templateId)}
+          onChange={(e) => setChosen(Number(e.target.value))}
+          disabled={busy !== null || templateList.length === 0}
+          className="max-w-60"
+        >
+          {templateList.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+              {t.isDefault ? ' (mặc định)' : ''}
+            </option>
+          ))}
+        </Select>
+        <Button
+          variant="primary"
+          onClick={runCheck}
+          disabled={busy !== null || templateId === null}
+        >
+          {busy === 'check' ? 'Đang kiểm tra…' : current ? 'Kiểm tra lại' : 'Kiểm tra'}
         </Button>
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         {current && (
           <>
             <Button onClick={() => exportAs('docx')} disabled={busy !== null}>
@@ -75,9 +121,20 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
             </Button>
           </>
         )}
-        <Link to="/settings" className="ml-auto text-[12px] text-accent hover:underline">
-          Sửa quy tắc định dạng
-        </Link>
+        <div className="ml-auto flex items-center gap-3 text-[12px]">
+          <button
+            type="button"
+            onClick={useAsTemplate}
+            disabled={busy !== null}
+            className="text-accent hover:underline disabled:opacity-40"
+            title="Học định dạng của tài liệu này thành một mẫu mới"
+          >
+            {busy === 'template' ? 'Đang tạo mẫu…' : 'Dùng tài liệu này làm mẫu'}
+          </button>
+          <Link to="/templates" className="text-accent hover:underline">
+            Quản lý mẫu
+          </Link>
+        </div>
       </div>
 
       <div className="mt-4">
@@ -91,8 +148,8 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
 
         {current === null && !busy && (
           <p className="text-[13px] text-muted">
-            Chưa kiểm tra lần nào. Bấm &quot;Kiểm tra định dạng&quot; để so tài liệu với quy tắc
-            trình bày (font, cỡ chữ, giãn dòng, lề...).
+            Chưa kiểm tra lần nào. Chọn mẫu rồi bấm &quot;Kiểm tra&quot; để so tài liệu với quy định
+            trình bày của mẫu (font, cỡ chữ, giãn dòng, heading, lề...).
           </p>
         )}
         {current && <ResultView result={current} />}
@@ -120,10 +177,9 @@ function ResultView({ result }: { result: FormatCheckResult }) {
             : `Phát hiện ${result.issues.length} lỗi định dạng`}
         </p>
         <p className="mt-0.5 text-[12px] text-muted">
-          Kiểm tra lúc {formatDateTime(result.checkedAt)} · {stats.paragraphs} đoạn có chữ (thân bài{' '}
-          {stats.bodyParagraphs}, heading {stats.headings}) · Quy tắc: {result.rules.fontFamily}{' '}
-          {formatNumber(result.rules.bodyFontSizePt)} pt, giãn{' '}
-          {formatNumber(result.rules.lineSpacing)} dòng
+          Theo mẫu <b className="text-text">{result.templateName}</b> · kiểm tra lúc{' '}
+          {formatDateTime(result.checkedAt)} · {stats.paragraphs} đoạn có chữ (thân bài{' '}
+          {stats.bodyParagraphs}, heading {stats.headings})
         </p>
         {groups.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1.5">
@@ -167,7 +223,7 @@ function IssueGroup({ id, title, issues }: { id: string; title: string; issues: 
         <table className="w-full table-fixed text-left text-[12px]">
           <thead className="bg-surface-2 text-muted">
             <tr>
-              <th className="w-20 px-3 py-1.5 font-medium">Vị trí</th>
+              <th className="w-36 px-3 py-1.5 font-medium">Vị trí</th>
               <th className="px-3 py-1.5 font-medium">Nội dung đầu đoạn</th>
               <th className="w-40 px-3 py-1.5 font-medium">Hiện tại</th>
               <th className="w-40 px-3 py-1.5 font-medium">Yêu cầu</th>
@@ -178,6 +234,7 @@ function IssueGroup({ id, title, issues }: { id: string; title: string; issues: 
               <tr key={idx} className="align-top">
                 <td className="px-3 py-1.5 whitespace-nowrap text-muted">
                   {i.paragraph === null ? '—' : `Đoạn ${i.paragraph}`}
+                  <span className="block text-[11px] text-muted/70">{i.context}</span>
                 </td>
                 <td className="truncate px-3 py-1.5 select-text" title={i.excerpt}>
                   {i.excerpt}
