@@ -36,6 +36,13 @@
       "when": 1795775798187,
       "tag": "0004_ai",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1795791623559,
+      "tag": "0005_prompts",
+      "breakpoints": true
     }
   ]
 }

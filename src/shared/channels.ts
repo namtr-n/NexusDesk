@@ -42,6 +42,7 @@ export const IPC = {
     listModels: 'ai:list-models',
     test: 'ai:test',
     analyze: 'ai:analyze',
+    analyzeWithPrompt: 'ai:analyze-with-prompt',
     cancel: 'ai:cancel',
     getAnalyses: 'ai:get-analyses',
     /** Sự kiện main → giao diện: từng đoạn chữ AI vừa trả về */
@@ -52,6 +53,17 @@ export const IPC = {
     cancel: 'polish:cancel',
     /** Sự kiện main → giao diện: tiến độ hoàn thiện */
     progressEvent: 'polish:progress'
+  },
+  prompts: {
+    list: 'prompts:list',
+    categories: 'prompts:categories',
+    get: 'prompts:get',
+    create: 'prompts:create',
+    update: 'prompts:update',
+    duplicate: 'prompts:duplicate',
+    remove: 'prompts:remove',
+    versions: 'prompts:versions',
+    restore: 'prompts:restore'
   },
   templates: {
     list: 'templates:list',

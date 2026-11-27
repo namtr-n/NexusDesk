@@ -54,7 +54,7 @@ Chủ dự án là sinh viên, chưa rành code, bận rộn. Từ GĐ 2 (27/11/
 
 Cập nhật lần cuối: 27/11/2026. Bảng giai đoạn chi tiết: docs/KE-HOACH.md.
 
-**Đã xong, đã kiểm thử (130 test xanh):**
+**Đã xong, đã kiểm thử (139 test xanh):**
 
 - GĐ0–2: khung app, IPC an toàn, dự án, tài liệu (PDF/DOCX/TXT/MD), kiểm tra định dạng DOCX,
   xuất báo cáo lỗi.
@@ -66,12 +66,14 @@ Cập nhật lần cuối: 27/11/2026. Bảng giai đoạn chi tiết: docs/KE-H
   (author "Nexus Desk AI"). Người dùng đã thử trong Word, đạt.
 - Thư mục kết quả: mặc định `Tài liệu\file báo cáo lưu trữ` (người dùng đã tự tạo), hộp thoại Lưu
   mở sẵn ở đó, đổi được trong Cài đặt, nút "Mở thư mục chứa file" sau mỗi lần lưu.
+- GĐ4 Thư viện prompt: trang `/prompts` (tìm FTS5 không dấu, danh mục, tag, dự án, lịch sử phiên
+  bản + khôi phục, nhân bản, sao chép), 4 prompt mẫu, chạy prompt trên tài liệu ở ô "Prompt của
+  tôi" (tab Phân tích AI). Đã chạy thật với Gemini. Người dùng chưa review.
 
 **Việc tiếp theo (theo thứ tự):**
 
-1. GĐ4 Thư viện prompt: người dùng tự viết/lưu yêu cầu cho AI, dùng khi phân tích tài liệu.
-2. GĐ5 Kho tài liệu + hỏi đáp RAG có trích nguồn (FTS5 trước, chưa dùng embedding).
-3. GĐ6 Dashboard thống kê (trang Tổng quan hiện chỉ có dự án + hoạt động gần đây), đóng gói .exe.
+1. GĐ5 Kho tài liệu + hỏi đáp RAG có trích nguồn (FTS5 trước, chưa dùng embedding).
+2. GĐ6 Dashboard thống kê (trang Tổng quan hiện chỉ có dự án + hoạt động gần đây), đóng gói .exe.
 
 Chỉ là định hướng, CHƯA làm khi người dùng chưa yêu cầu: mục lục, danh mục hình/bảng, từ viết tắt,
 ngắt trang, đánh số trang (ghi ở docs/KE-HOACH.md).

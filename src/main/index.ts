@@ -18,6 +18,7 @@ import { createDocumentService } from './services/documents/document-service'
 import { createFormatService } from './services/format/format-service'
 import { createTemplateService } from './services/format/template-service'
 import { createProjectService } from './services/projects/project-service'
+import { createPromptService } from './services/prompts/prompt-service'
 import { createMainWindow } from './window'
 
 // Chỉ cho chạy một bản app cùng lúc (tránh hai bản cùng ghi vào database).
@@ -62,6 +63,8 @@ function bootstrap(): boolean {
       encrypt: (plain) => safeStorage.encryptString(plain),
       decrypt: (data) => safeStorage.decryptString(data)
     }
+    const prompts = createPromptService({ db: database.db, settings, activity })
+    prompts.ensureStarter()
     const ai = createAiService({
       db: database.db,
       keys: createKeyStore(settings, encryptor),
@@ -70,6 +73,7 @@ function bootstrap(): boolean {
       activity,
       logger,
       clientFactory: createGeminiClient,
+      prompts,
       encryptionAvailable: () => safeStorage.isEncryptionAvailable()
     })
 
@@ -83,6 +87,7 @@ function bootstrap(): boolean {
       templates,
       ai,
       polish,
+      prompts,
       pickDocumentFiles,
       pickTemplateFile,
       pickSavePath,

@@ -8,6 +8,7 @@ import {
   AI_TASK_INFO,
   AI_TASKS,
   type AiAnalysis,
+  type AiAnalysisTask,
   type AiModelOption,
   type AiStatus,
   type AiTask,
@@ -22,7 +23,7 @@ import type { DocumentService } from '../documents/document-service'
 import type { SettingsStore } from '../settings/settings-store'
 import type { AiClient, AiClientFactory } from './gemini-client'
 import type { KeyStore } from './key-store'
-import { buildPrompt } from './prompts'
+import { buildCustomPrompt, buildPrompt } from './prompts'
 import { RunError, runWithFallback, type RunControl } from './stream-runner'
 
 const MODEL_KEY = 'ai.model'
@@ -45,6 +46,13 @@ export interface AiService {
   analyze(
     documentId: number,
     task: AiTask,
+    requestId: string,
+    onChunk: (text: string) => void
+  ): Promise<AiAnalysis>
+  /** Chạy một prompt trong thư viện trên tài liệu (stream như analyze) */
+  analyzeWithPrompt(
+    documentId: number,
+    promptId: number,
     requestId: string,
     onChunk: (text: string) => void
   ): Promise<AiAnalysis>
@@ -77,10 +85,17 @@ export interface AiServiceDeps {
   activity: ActivityRepository
   logger: ErrorLogger
   clientFactory: AiClientFactory
+  /** Thư viện prompt (cho analyzeWithPrompt) */
+  prompts?: PromptLookup
   encryptionAvailable: () => boolean
   idleTimeoutMs?: number
   firstChunkTimeoutMs?: number
   retryDelaysMs?: number[]
+}
+
+export interface PromptLookup {
+  get(id: number): { id: number; title: string; content: string }
+  markUsed(id: number): void
 }
 
 /** Các model gemini-X.Y-flash ổn định, phiên bản mới nhất trước */
@@ -137,6 +152,8 @@ const toAnalysis = (r: Row): AiAnalysis => ({
   id: r.id,
   documentId: r.documentId,
   task: r.task,
+  promptId: r.promptId,
+  promptTitle: r.promptTitle,
   model: r.model,
   content: r.content,
   truncated: r.truncated,
@@ -250,6 +267,107 @@ export function createAiService(deps: AiServiceDeps): AiService {
     }
   }
 
+  interface AnalysisJob {
+    documentId: number
+    requestId: string
+    onChunk: (text: string) => void
+    /** Tác vụ có sẵn hoặc 'custom' */
+    task: AiAnalysisTask
+    prompt: { id: number; title: string } | null
+    build: (documentName: string, text: string) => ReturnType<typeof buildPrompt>
+    /** Nhãn ghi vào nhật ký hoạt động */
+    label: string
+  }
+
+  /** Chạy phân tích có stream, lưu kết quả + thống kê (dùng chung cho tác vụ có sẵn và prompt) */
+  async function runAnalysis(job: AnalysisJob): Promise<AiAnalysis> {
+    const { documentId, requestId, onChunk, task } = job
+    if (running.has(requestId)) throw new UserError('Yêu cầu này đang chạy.')
+    const doc = documents.getSummary(documentId)
+    const { text } = documents.get(documentId) // bản xem trước tối đa 200.000 ký tự
+    if (!text.trim()) throw new UserError('Tài liệu không có nội dung chữ để AI phân tích.')
+
+    const c = client()
+    const { models, auto } = await modelPlan(c)
+    const primary = models[0]
+    const { system, prompt, truncated } = job.build(doc.name, text)
+    const control: RunControl = {}
+    running.set(requestId, control)
+
+    const start = Date.now()
+    let result
+    try {
+      result = await runWithFallback({
+        client: c,
+        models,
+        system,
+        prompt,
+        thinking: 'low',
+        idleTimeoutMs: idleTimeout,
+        firstChunkTimeoutMs: firstChunkTimeout,
+        retryDelaysMs,
+        control,
+        onChunk,
+        onAttemptFailed: logAttempt
+      })
+    } catch (err) {
+      const cancelled = err instanceof RunError && err.kind === 'cancelled'
+      const message = runErrorMessage(err, primary)
+      const usage = err instanceof RunError ? err.usage : { inputTokens: 0, outputTokens: 0 }
+      recordUsage({
+        task,
+        model: err instanceof RunError ? err.model : primary,
+        documentId,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        durationMs: Date.now() - start,
+        status: cancelled ? 'cancelled' : 'error',
+        error: message,
+        createdAt: Date.now()
+      })
+      throw new UserError(message)
+    } finally {
+      running.delete(requestId)
+    }
+
+    const { model, content, usage } = result
+    rememberHealthy(auto, model)
+    const createdAt = Date.now()
+    return db.transaction(() => {
+      const row = db
+        .insert(aiAnalyses)
+        .values({
+          documentId,
+          task,
+          promptId: job.prompt?.id ?? null,
+          promptTitle: job.prompt?.title ?? null,
+          model,
+          content,
+          truncated,
+          createdAt
+        })
+        .returning()
+        .get()
+      recordUsage({
+        task,
+        model,
+        documentId,
+        inputTokens: usage.inputTokens,
+        outputTokens: usage.outputTokens,
+        durationMs: createdAt - start,
+        status: 'ok',
+        error: null,
+        createdAt
+      })
+      activity.log({
+        type: 'ai.analyzed',
+        message: `AI ${job.label} "${doc.name}"`,
+        projectId: doc.projectId
+      })
+      return toAnalysis(row)
+    })
+  }
+
   return {
     getStatus: status,
 
@@ -298,81 +416,31 @@ export function createAiService(deps: AiServiceDeps): AiService {
 
     async analyze(documentId, task, requestId, onChunk) {
       if (!AI_TASKS.includes(task)) throw new UserError('Tác vụ AI không hợp lệ.')
-      if (running.has(requestId)) throw new UserError('Yêu cầu này đang chạy.')
-      const doc = documents.getSummary(documentId)
-      const { text } = documents.get(documentId) // bản xem trước tối đa 200.000 ký tự
-      if (!text.trim()) throw new UserError('Tài liệu không có nội dung chữ để AI phân tích.')
-
-      const c = client()
-      const { models, auto } = await modelPlan(c)
-      const primary = models[0]
-      const { system, prompt, truncated } = buildPrompt(task, doc.name, text)
-      const control: RunControl = {}
-      running.set(requestId, control)
-
-      const start = Date.now()
-      let result
-      try {
-        result = await runWithFallback({
-          client: c,
-          models,
-          system,
-          prompt,
-          thinking: 'low',
-          idleTimeoutMs: idleTimeout,
-          firstChunkTimeoutMs: firstChunkTimeout,
-          retryDelaysMs,
-          control,
-          onChunk,
-          onAttemptFailed: logAttempt
-        })
-      } catch (err) {
-        const cancelled = err instanceof RunError && err.kind === 'cancelled'
-        const message = runErrorMessage(err, primary)
-        const usage = err instanceof RunError ? err.usage : { inputTokens: 0, outputTokens: 0 }
-        recordUsage({
-          task,
-          model: err instanceof RunError ? err.model : primary,
-          documentId,
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          durationMs: Date.now() - start,
-          status: cancelled ? 'cancelled' : 'error',
-          error: message,
-          createdAt: Date.now()
-        })
-        throw new UserError(message)
-      } finally {
-        running.delete(requestId)
-      }
-
-      const { model, content, usage } = result
-      rememberHealthy(auto, model)
-      const createdAt = Date.now()
-      return db.transaction(() => {
-        const row = db
-          .insert(aiAnalyses)
-          .values({ documentId, task, model, content, truncated, createdAt })
-          .returning()
-          .get()
-        recordUsage({
-          task,
-          model,
-          documentId,
-          inputTokens: usage.inputTokens,
-          outputTokens: usage.outputTokens,
-          durationMs: createdAt - start,
-          status: 'ok',
-          error: null,
-          createdAt
-        })
-        activity.log({
-          type: 'ai.analyzed',
-          message: `AI ${AI_TASK_INFO[task].label.toLowerCase()} "${doc.name}"`,
-          projectId: doc.projectId
-        })
-        return toAnalysis(row)
+      return runAnalysis({
+        documentId,
+        requestId,
+        onChunk,
+        task,
+        prompt: null,
+        build: (name, text) => buildPrompt(task, name, text),
+        label: AI_TASK_INFO[task].label.toLowerCase()
       })
+    },
+
+    async analyzeWithPrompt(documentId, promptId, requestId, onChunk) {
+      if (!deps.prompts) throw new UserError('Thư viện prompt chưa sẵn sàng.')
+      const p = deps.prompts.get(promptId)
+      const result = await runAnalysis({
+        documentId,
+        requestId,
+        onChunk,
+        task: 'custom',
+        prompt: { id: p.id, title: p.title },
+        build: (name, text) => buildCustomPrompt(p.content, name, text),
+        label: `chạy prompt "${p.title}" trên`
+      })
+      deps.prompts.markUsed(p.id)
+      return result
     },
 
     async complete({ task, system, prompt, json, documentId, control }) {
@@ -444,6 +512,19 @@ export function createAiService(deps: AiServiceDeps): AiService {
           .limit(1)
           .get()
         if (row) out.push(toAnalysis(row))
+      }
+      // Prompt của người dùng: bản mới nhất cho mỗi prompt còn trong thư viện
+      const custom = db
+        .select()
+        .from(aiAnalyses)
+        .where(and(eq(aiAnalyses.documentId, documentId), eq(aiAnalyses.task, 'custom')))
+        .orderBy(desc(aiAnalyses.createdAt), desc(aiAnalyses.id))
+        .all()
+      const seen = new Set<number>()
+      for (const row of custom) {
+        if (row.promptId === null || seen.has(row.promptId)) continue
+        seen.add(row.promptId)
+        out.push(toAnalysis(row))
       }
       return out
     }

@@ -73,10 +73,16 @@ export interface AiTestResult {
   latencyMs: number
 }
 
+/** Tác vụ của một kết quả phân tích: 3 tác vụ có sẵn hoặc 'custom' = prompt trong thư viện */
+export type AiAnalysisTask = AiTask | 'custom'
+
 export interface AiAnalysis {
   id: number
   documentId: number
-  task: AiTask
+  task: AiAnalysisTask
+  /** task = 'custom': prompt đã dùng (null nếu đã bị xóa khỏi thư viện) */
+  promptId: number | null
+  promptTitle: string | null
   model: string
   content: string
   /** Tài liệu dài hơn giới hạn nên chỉ gửi phần đầu */

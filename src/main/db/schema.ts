@@ -5,7 +5,7 @@
  */
 import { sqliteTable, integer, text, index } from 'drizzle-orm/sqlite-core'
 import type { DocumentKind, ExtractStatus } from '@shared/ipc-contract'
-import type { AiTask } from '@shared/ai'
+import type { AiAnalysisTask } from '@shared/ai'
 
 export const projects = sqliteTable('projects', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -124,13 +124,57 @@ export const aiAnalyses = sqliteTable(
     documentId: integer('document_id')
       .notNull()
       .references(() => documents.id, { onDelete: 'cascade' }),
-    task: text('task').$type<AiTask>().notNull(),
+    task: text('task').$type<AiAnalysisTask>().notNull(),
+    /** task = 'custom': prompt trong thư viện đã dùng (null nếu prompt đã bị xóa) */
+    promptId: integer('prompt_id').references(() => prompts.id, { onDelete: 'set null' }),
+    /** Tiêu đề prompt lúc chạy (giữ lại để hiện kể cả khi prompt bị xóa / đổi tên) */
+    promptTitle: text('prompt_title'),
     model: text('model').notNull(),
     content: text('content').notNull(),
     truncated: integer('truncated', { mode: 'boolean' }).notNull().default(false),
     createdAt: integer('created_at').notNull()
   },
-  (t) => [index('ai_analyses_document_idx').on(t.documentId, t.task, t.createdAt)]
+  (t) => [
+    index('ai_analyses_document_idx').on(t.documentId, t.task, t.createdAt),
+    index('ai_analyses_prompt_idx').on(t.documentId, t.promptId, t.createdAt)
+  ]
+)
+
+/**
+ * Thư viện prompt. Bảng tìm kiếm prompts_fts (FTS5) tạo bằng migration viết tay,
+ * tự đồng bộ qua trigger (xem drizzle/0005_prompts.sql).
+ */
+export const prompts = sqliteTable(
+  'prompts',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
+    category: text('category').notNull().default(''),
+    /** Mảng tag dạng JSON */
+    tagsJson: text('tags_json').notNull().default('[]'),
+    projectId: integer('project_id').references(() => projects.id, { onDelete: 'set null' }),
+    useCount: integer('use_count').notNull().default(0),
+    lastUsedAt: integer('last_used_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull()
+  },
+  (t) => [index('prompts_updated_at_idx').on(t.updatedAt)]
+)
+
+/** Lịch sử phiên bản: mỗi lần tạo / đổi tiêu đề hoặc nội dung lưu một bản. */
+export const promptVersions = sqliteTable(
+  'prompt_versions',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    promptId: integer('prompt_id')
+      .notNull()
+      .references(() => prompts.id, { onDelete: 'cascade' }),
+    title: text('title').notNull(),
+    content: text('content').notNull(),
+    createdAt: integer('created_at').notNull()
+  },
+  (t) => [index('prompt_versions_prompt_idx').on(t.promptId, t.createdAt)]
 )
 
 /** Nội dung chữ trích từ tài liệu (tách bảng riêng vì có thể rất lớn). */

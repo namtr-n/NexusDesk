@@ -8,6 +8,8 @@ App desktop Windows giúp kiểm tra và hoàn thiện báo cáo Word (DOCX):
 - **Hoàn thiện báo cáo**: sửa định dạng + AI (Gemini) sửa chính tả, văn phong. Mọi sửa đổi câu chữ
   được ghi bằng Track Changes để bạn Accept / Reject trong Word.
 - **Phân tích AI**: nhận xét tổng quan, chính tả, văn phong.
+- **Thư viện prompt**: lưu các yêu cầu hay nhờ AI làm (câu hỏi phản biện, dàn ý slide, tóm tắt…),
+  tìm kiếm, lịch sử phiên bản, chạy trên tài liệu bằng một cú bấm.
 
 Dữ liệu lưu trên máy bạn, không có tài khoản, không có server.
 

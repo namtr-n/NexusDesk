@@ -3,6 +3,7 @@ import { AppLayout } from '@renderer/components/layout/AppLayout'
 import { ComingSoonPage } from '@renderer/pages/ComingSoonPage'
 import { DashboardPage } from '@renderer/pages/Dashboard/DashboardPage'
 import { DocumentsPage } from '@renderer/pages/Documents/DocumentsPage'
+import { PromptsPage } from '@renderer/pages/Prompts/PromptsPage'
 import { SettingsPage } from '@renderer/pages/Settings/SettingsPage'
 import { TemplatesPage } from '@renderer/pages/Templates/TemplatesPage'
 
@@ -30,21 +31,7 @@ export const router = createHashRouter([
           />
         )
       },
-      {
-        path: 'prompts',
-        element: (
-          <ComingSoonPage
-            title="Prompt"
-            description="Thư viện prompt cá nhân."
-            phase={4}
-            features={[
-              'Lưu, sửa, xóa prompt',
-              'Phân loại, tìm kiếm',
-              'Sao chép một chạm, lịch sử phiên bản'
-            ]}
-          />
-        )
-      },
+      { path: 'prompts', element: <PromptsPage /> },
       { path: 'settings', element: <SettingsPage /> }
     ]
   }

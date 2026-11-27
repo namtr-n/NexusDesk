@@ -20,6 +20,7 @@ import {
   templatePresetSchema,
   templateUpdateSchema,
   aiAnalyzeSchema,
+  aiAnalyzeWithPromptSchema,
   aiCancelSchema,
   aiSetKeySchema,
   aiSetModelSchema,
@@ -29,6 +30,14 @@ import {
 } from '@shared/ipc-contract'
 import type { AiChunkEvent } from '@shared/ai'
 import { polishRunSchema, type PolishProgressEvent } from '@shared/polish'
+import {
+  promptCreateSchema,
+  promptIdSchema,
+  promptListSchema,
+  promptRestoreSchema,
+  promptUpdateSchema
+} from '@shared/prompts'
+import type { PromptService } from '../services/prompts/prompt-service'
 import type { PolishService } from '../services/polish/polish-service'
 import type { ReportFormat } from '@shared/format'
 import { logger } from '../logger'
@@ -51,6 +60,7 @@ export interface IpcDependencies {
   templates: TemplateService
   ai: AiService
   polish: PolishService
+  prompts: PromptService
   /** Hiện hộp thoại chọn file của Windows; trả [] nếu người dùng bấm Hủy */
   pickDocumentFiles: () => Promise<string[]>
   /** Hộp thoại chọn MỘT file DOCX mẫu; trả null nếu người dùng bấm Hủy */
@@ -203,7 +213,27 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
       ctx.send(IPC.ai.chunkEvent, event)
     })
   )
+  register(IPC.ai.analyzeWithPrompt, aiAnalyzeWithPromptSchema, (input, ctx) =>
+    deps.ai.analyzeWithPrompt(input.documentId, input.promptId, input.requestId, (text) => {
+      const event: AiChunkEvent = { requestId: input.requestId, text }
+      ctx.send(IPC.ai.chunkEvent, event)
+    })
+  )
   register(IPC.ai.cancel, aiCancelSchema, (input) => deps.ai.cancel(input.requestId))
+
+  register(IPC.prompts.list, promptListSchema, (input) => deps.prompts.list(input))
+  register(IPC.prompts.categories, noInput, () => deps.prompts.categories())
+  register(IPC.prompts.get, promptIdSchema, (input) => deps.prompts.get(input.id))
+  register(IPC.prompts.create, promptCreateSchema, (input) => deps.prompts.create(input))
+  register(IPC.prompts.update, promptUpdateSchema, ({ id, ...fields }) =>
+    deps.prompts.update(id, fields)
+  )
+  register(IPC.prompts.duplicate, promptIdSchema, (input) => deps.prompts.duplicate(input.id))
+  register(IPC.prompts.remove, promptIdSchema, (input) => deps.prompts.remove(input.id))
+  register(IPC.prompts.versions, promptIdSchema, (input) => deps.prompts.versions(input.id))
+  register(IPC.prompts.restore, promptRestoreSchema, (input) =>
+    deps.prompts.restore(input.id, input.versionId)
+  )
 
   register(IPC.polish.run, polishRunSchema, async (input, ctx) => {
     const target = await pickOutput(deps.polish.suggestName(input.documentId), 'docx')

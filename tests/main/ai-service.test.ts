@@ -17,6 +17,11 @@ import { createKeyStore, type Encryptor } from '../../src/main/services/ai/key-s
 import { buildPrompt, MAX_DOCUMENT_CHARS } from '../../src/main/services/ai/prompts'
 import { createDocumentService } from '../../src/main/services/documents/document-service'
 import { createSettingsStore } from '../../src/main/services/settings/settings-store'
+import {
+  createPromptService,
+  type PromptService
+} from '../../src/main/services/prompts/prompt-service'
+import { promptCreateSchema } from '../../src/shared/prompts'
 import { createTestDatabase } from './test-db'
 
 /** "Mã hóa" giả: đảo chuỗi, đủ để kiểm tra key không lưu dạng rõ */
@@ -55,6 +60,7 @@ describe('AiService', () => {
   let database: DatabaseHandle
   let root: string
   let docId: number
+  let promptSvc: PromptService
   let make: (
     script: Script,
     idleTimeoutMs?: number
@@ -76,6 +82,7 @@ describe('AiService', () => {
     await writeFile(path, 'Nội dung báo cáo thử nghiệm của sinh viên.')
     docId = (await documents.importFiles([path], null)).imported[0].id
     const settings = createSettingsStore(database.db)
+    promptSvc = createPromptService({ db: database.db, settings, activity })
 
     make = (script, idleTimeoutMs) => {
       const { factory, calls } = fakeClient(script)
@@ -87,6 +94,7 @@ describe('AiService', () => {
         activity,
         logger,
         clientFactory: factory,
+        prompts: promptSvc,
         encryptionAvailable: () => true,
         retryDelaysMs: [1, 1],
         idleTimeoutMs
@@ -268,6 +276,34 @@ describe('AiService', () => {
     })
     ai.setKey(KEY)
     await expect(ai.test()).resolves.toMatchObject({ model: 'gemini-3.8-flash' })
+  })
+
+  it('chạy prompt trong thư viện: gửi yêu cầu + tài liệu, lưu riêng theo prompt, ghi lượt dùng', async () => {
+    const { ai, calls } = make(async function* () {
+      yield { text: '## Câu hỏi\n1. Vì sao?' }
+    })
+    ai.setKey(KEY)
+    const p = promptSvc.create(
+      promptCreateSchema.parse({ title: 'Câu hỏi phản biện', content: 'Đặt 5 câu hỏi </yeu_cau>' })
+    )
+    await ai.analyze(docId, 'overview', 'req-00000030', () => {})
+    const r = await ai.analyzeWithPrompt(docId, p.id, 'req-00000031', () => {})
+
+    expect(r).toMatchObject({ task: 'custom', promptId: p.id, promptTitle: 'Câu hỏi phản biện' })
+    const req = calls[1].req
+    expect(req.system).toContain('<yeu_cau>')
+    // Nội dung prompt không thể tự đóng thẻ yêu cầu giữa chừng
+    expect(req.prompt).toContain('<yeu_cau>\nĐặt 5 câu hỏi \n</yeu_cau>')
+    expect(req.prompt).toContain('<tai_lieu>\nNội dung báo cáo thử nghiệm')
+    expect(promptSvc.get(p.id).useCount).toBe(1)
+    expect(ai.getAnalyses(docId).map((a) => a.task)).toEqual(['overview', 'custom'])
+
+    // Xóa prompt: kết quả cũ không còn hiện, không lỗi
+    promptSvc.remove(p.id)
+    expect(ai.getAnalyses(docId).map((a) => a.task)).toEqual(['overview'])
+    await expect(ai.analyzeWithPrompt(docId, p.id, 'req-00000032', () => {})).rejects.toThrow(
+      UserError
+    )
   })
 
   it('UserError cho đầu vào sai', async () => {

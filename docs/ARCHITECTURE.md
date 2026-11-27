@@ -124,13 +124,28 @@ AI (`src/main/services/ai/`):
 - Kênh `app:reveal-file` chỉ mở Explorer cho file app vừa lưu trong phiên (danh sách `remember`),
   renderer không mở được đường dẫn tùy ý.
 
+### Đã có (GĐ 4 – Thư viện prompt)
+
+| Bảng              | Cột chính                                                                           | Ghi chú                                                      |
+| ----------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `prompts`         | title, content, category, tags_json, project_id (set null), use_count, last_used_at | 4 prompt mẫu thêm một lần (`settings['prompts.seeded']`)     |
+| `prompt_versions` | prompt_id (cascade), title, content, created_at                                     | Thêm bản mới khi tạo / đổi tiêu đề hoặc nội dung / khôi phục |
+| `prompts_fts`     | FTS5 (title, content, tags, category), rowid = prompts.id                           | Viết tay trong `0005_prompts.sql`, trigger tự đồng bộ        |
+| `ai_analyses`     | thêm prompt_id (set null), prompt_title; task = 'custom'                            | Kết quả chạy prompt trên tài liệu                            |
+
+- `services/prompts/prompt-service.ts`: CRUD, nhân bản, phiên bản, khôi phục, `markUsed`.
+  Tìm kiếm: `toFtsQuery` đổi chữ người dùng thành `"từ"*` nối AND (bỏ ký tự cú pháp FTS5);
+  tokenizer `unicode61 remove_diacritics 2` nên gõ không dấu vẫn khớp; xếp hạng bm25 (tiêu đề nặng nhất).
+- `ai-service.analyzeWithPrompt`: dùng chung luồng stream / dự phòng model với `analyze`.
+  `buildCustomPrompt` bọc prompt trong `<yeu_cau>` (xóa thẻ đóng giả trong nội dung) và tài liệu trong
+  `<tai_lieu>`; system prompt dặn tài liệu là dữ liệu, không phải mệnh lệnh.
+- Giao diện: trang `/prompts` (danh sách + tìm + lọc, trình soạn, lịch sử phiên bản) và ô
+  "Prompt của tôi" trong tab Phân tích AI.
+
 ### Dự kiến (tạo khi tới giai đoạn tương ứng)
 
 | Bảng                   | GĐ  | Mục đích                                                 |
 | ---------------------- | --- | -------------------------------------------------------- |
-| `prompts`              | 4   | Prompt: tiêu đề, danh mục, tag, project_id               |
-| `prompt_versions`      | 4   | Lịch sử phiên bản nội dung prompt                        |
-| `prompts_fts`          | 4   | Bảng FTS5 để tìm kiếm prompt                             |
 | `knowledge_chunks`     | 5   | Đoạn văn bản cắt từ tài liệu + vị trí nguồn (trang/đoạn) |
 | `knowledge_chunks_fts` | 5   | Bảng FTS5 để truy hồi đoạn liên quan khi hỏi đáp         |
 

@@ -6,7 +6,7 @@
 | 1   | Khung app: cửa sổ, sidebar, dark mode, database, IPC an toàn | Duyệt kế hoạch của AI, cấu trúc project | ✅ Xong    |
 | 2   | Kiểm tra định dạng báo cáo DOCX theo chuẩn, xuất báo cáo lỗi | Test, đọc diff, code review             | ✅ Xong    |
 | 3   | Tích hợp Gemini: nhận xét nội dung, chính tả, văn phong      | API key, prompt, token, chi phí         | ✅ Xong    |
-| 4   | Thư viện prompt (người dùng tự viết yêu cầu)                 | Viết yêu cầu cho AI                     | ⏳         |
+| 4   | Thư viện prompt (người dùng tự viết yêu cầu)                 | Viết yêu cầu cho AI                     | ✅ Xong    |
 | 5   | Kho tài liệu + hỏi đáp RAG có trích nguồn                    | RAG, chống AI bịa                       | ⏳         |
 | 6   | Dashboard, đóng gói .exe                                     | Build, phát hành                        | ⏳         |
 

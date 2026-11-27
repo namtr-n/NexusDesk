@@ -47,6 +47,7 @@ const api: NexusApi = {
     listModels: () => ipcRenderer.invoke(IPC.ai.listModels),
     test: () => ipcRenderer.invoke(IPC.ai.test),
     analyze: (input) => ipcRenderer.invoke(IPC.ai.analyze, input),
+    analyzeWithPrompt: (input) => ipcRenderer.invoke(IPC.ai.analyzeWithPrompt, input),
     cancel: (input) => ipcRenderer.invoke(IPC.ai.cancel, input),
     getAnalyses: (input) => ipcRenderer.invoke(IPC.ai.getAnalyses, input),
     onChunk: (listener) => {
@@ -69,6 +70,17 @@ const api: NexusApi = {
         ipcRenderer.removeListener(IPC.polish.progressEvent, handler)
       }
     }
+  },
+  prompts: {
+    list: (input) => ipcRenderer.invoke(IPC.prompts.list, input),
+    categories: () => ipcRenderer.invoke(IPC.prompts.categories),
+    get: (input) => ipcRenderer.invoke(IPC.prompts.get, input),
+    create: (input) => ipcRenderer.invoke(IPC.prompts.create, input),
+    update: (input) => ipcRenderer.invoke(IPC.prompts.update, input),
+    duplicate: (input) => ipcRenderer.invoke(IPC.prompts.duplicate, input),
+    remove: (input) => ipcRenderer.invoke(IPC.prompts.remove, input),
+    versions: (input) => ipcRenderer.invoke(IPC.prompts.versions, input),
+    restore: (input) => ipcRenderer.invoke(IPC.prompts.restore, input)
   },
   templates: {
     list: () => ipcRenderer.invoke(IPC.templates.list),

@@ -16,6 +16,16 @@ import {
   type AiTestResult
 } from './ai'
 import type { PolishOutcome, PolishProgressEvent, PolishRunInput } from './polish'
+import type {
+  Prompt,
+  PromptCreateInput,
+  PromptIdInput,
+  PromptListInput,
+  PromptRestoreInput,
+  PromptSummary,
+  PromptUpdateInput,
+  PromptVersion
+} from './prompts'
 import {
   templateNameSchema,
   templateSpecSchema,
@@ -90,6 +100,8 @@ export type ActivityType =
   | 'format.fixed'
   | 'ai.analyzed'
   | 'ai.polished'
+  | 'prompt.created'
+  | 'prompt.deleted'
 
 export interface ActivityEntry {
   id: number
@@ -192,6 +204,12 @@ export const aiAnalyzeSchema = z.object({
   requestId: requestIdSchema
 })
 export const aiCancelSchema = z.object({ requestId: requestIdSchema })
+export const aiAnalyzeWithPromptSchema = z.object({
+  documentId: entityId,
+  promptId: entityId,
+  requestId: requestIdSchema
+})
+export type AiAnalyzeWithPromptInput = z.input<typeof aiAnalyzeWithPromptSchema>
 
 export type AiSetKeyInput = z.input<typeof aiSetKeySchema>
 export type AiSetModelInput = z.input<typeof aiSetModelSchema>
@@ -290,6 +308,8 @@ export interface NexusApi {
     test(): Promise<Result<AiTestResult>>
     /** Chạy phân tích; trong lúc chạy, từng đoạn chữ được gửi qua onChunk */
     analyze(input: AiAnalyzeInput): Promise<Result<AiAnalysis>>
+    /** Chạy một prompt trong thư viện trên tài liệu (stream qua onChunk như analyze) */
+    analyzeWithPrompt(input: AiAnalyzeWithPromptInput): Promise<Result<AiAnalysis>>
     cancel(input: AiCancelInput): Promise<Result<boolean>>
     getAnalyses(input: DocumentIdInput): Promise<Result<AiAnalysis[]>>
     /** Đăng ký nhận đoạn chữ đang stream; trả về hàm hủy đăng ký */
@@ -300,6 +320,18 @@ export interface NexusApi {
     run(input: PolishRunInput): Promise<Result<PolishOutcome>>
     cancel(input: AiCancelInput): Promise<Result<boolean>>
     onProgress(listener: (event: PolishProgressEvent) => void): () => void
+  }
+  prompts: {
+    /** Tìm kiếm / lọc; không có từ khóa thì sắp theo lần sửa gần nhất */
+    list(input?: PromptListInput): Promise<Result<PromptSummary[]>>
+    categories(): Promise<Result<{ name: string; count: number }[]>>
+    get(input: PromptIdInput): Promise<Result<Prompt>>
+    create(input: PromptCreateInput): Promise<Result<Prompt>>
+    update(input: PromptUpdateInput): Promise<Result<Prompt>>
+    duplicate(input: PromptIdInput): Promise<Result<Prompt>>
+    remove(input: PromptIdInput): Promise<Result<{ id: number }>>
+    versions(input: PromptIdInput): Promise<Result<PromptVersion[]>>
+    restore(input: PromptRestoreInput): Promise<Result<Prompt>>
   }
   templates: {
     list(): Promise<Result<FormatTemplateSummary[]>>
