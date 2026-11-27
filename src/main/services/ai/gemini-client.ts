@@ -12,6 +12,8 @@ export interface StreamRequest {
   signal: AbortSignal
   /** Mức "suy nghĩ" cho model Gemini 3+: minimal (nhanh nhất) hoặc low */
   thinking?: 'minimal' | 'low'
+  /** Yêu cầu trả về JSON (responseMimeType application/json) */
+  json?: boolean
 }
 
 export interface StreamChunk {
@@ -44,7 +46,7 @@ export function supportsThinkingLevel(model: string): boolean {
 export const createGeminiClient: AiClientFactory = (apiKey) => {
   const ai = new GoogleGenAI({ apiKey })
   return {
-    async *stream({ model, system, prompt, signal, thinking }) {
+    async *stream({ model, system, prompt, signal, thinking, json }) {
       const t0 = Date.now()
       let chunks = 0
       logger.info(`[gemini] bắt đầu ${model}, prompt ${prompt.length} ký tự`)
@@ -61,6 +63,7 @@ export const createGeminiClient: AiClientFactory = (apiKey) => {
           systemInstruction: system,
           temperature: 0.3,
           abortSignal: signal,
+          ...(json ? { responseMimeType: 'application/json' } : {}),
           ...(thinkingConfig ? { thinkingConfig } : {})
         }
       })

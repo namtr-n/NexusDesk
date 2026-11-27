@@ -27,6 +27,8 @@ import {
   type Result
 } from '@shared/ipc-contract'
 import type { AiChunkEvent } from '@shared/ai'
+import { polishRunSchema, type PolishProgressEvent } from '@shared/polish'
+import type { PolishService } from '../services/polish/polish-service'
 import type { ReportFormat } from '@shared/format'
 import { logger } from '../logger'
 import type { ActivityRepository } from '../services/activity/activity-repository'
@@ -45,6 +47,7 @@ export interface IpcDependencies {
   format: FormatService
   templates: TemplateService
   ai: AiService
+  polish: PolishService
   /** Hiện hộp thoại chọn file của Windows; trả [] nếu người dùng bấm Hủy */
   pickDocumentFiles: () => Promise<string[]>
   /** Hộp thoại chọn MỘT file DOCX mẫu; trả null nếu người dùng bấm Hủy */
@@ -160,5 +163,15 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     })
   )
   register(IPC.ai.cancel, aiCancelSchema, (input) => deps.ai.cancel(input.requestId))
+
+  register(IPC.polish.run, polishRunSchema, async (input, ctx) => {
+    const target = await deps.pickSavePath(deps.polish.suggestName(input.documentId), 'docx')
+    if (!target) return { cancelled: true, result: null }
+    const result = await deps.polish.run(input, target, (event: PolishProgressEvent) =>
+      ctx.send(IPC.polish.progressEvent, event)
+    )
+    return { cancelled: false, result }
+  })
+  register(IPC.polish.cancel, aiCancelSchema, (input) => deps.polish.cancel(input.requestId))
   register(IPC.ai.getAnalyses, documentIdSchema, (input) => deps.ai.getAnalyses(input.id))
 }

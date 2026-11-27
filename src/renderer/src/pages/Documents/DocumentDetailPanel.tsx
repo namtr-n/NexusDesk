@@ -9,6 +9,7 @@ import { formatBytes, formatDateTime, formatNumber } from '@renderer/lib/format'
 import { AiAnalysisPanel } from './AiAnalysisPanel'
 import { FormatCheckPanel } from './FormatCheckPanel'
 import { KindBadge } from './KindBadge'
+import { PolishPanel } from './PolishPanel'
 
 interface Props {
   id: number
@@ -25,7 +26,7 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved, onOpen
   const state = useAsyncData(load, version)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<'format' | 'ai' | 'content'>('format')
+  const [tab, setTab] = useState<'format' | 'polish' | 'ai' | 'content'>('format')
 
   if (state.status === 'loading')
     return (
@@ -45,7 +46,7 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved, onOpen
   const doc = state.data
   // Tab "Kiểm tra định dạng" chỉ có với DOCX, "Phân tích AI" chỉ khi có chữ
   const activeTab =
-    tab === 'format' && doc.kind !== 'docx'
+    (tab === 'format' || tab === 'polish') && doc.kind !== 'docx'
       ? doc.text
         ? 'ai'
         : 'content'
@@ -133,6 +134,11 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved, onOpen
             Kiểm tra định dạng
           </Tab>
         )}
+        {doc.kind === 'docx' && (
+          <Tab active={activeTab === 'polish'} onClick={() => setTab('polish')}>
+            Hoàn thiện
+          </Tab>
+        )}
         {doc.text && (
           <Tab active={activeTab === 'ai'} onClick={() => setTab('ai')}>
             Phân tích AI
@@ -146,6 +152,8 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved, onOpen
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {activeTab === 'format' ? (
           <FormatCheckPanel documentId={doc.id} onOpenDocument={onOpenDocument} />
+        ) : activeTab === 'polish' ? (
+          <PolishPanel documentId={doc.id} onOpenDocument={onOpenDocument} />
         ) : activeTab === 'ai' ? (
           <AiAnalysisPanel documentId={doc.id} />
         ) : doc.text ? (

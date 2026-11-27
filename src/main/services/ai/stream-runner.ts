@@ -26,6 +26,8 @@ export interface RunOptions {
   system: string
   prompt: string
   thinking?: StreamRequest['thinking']
+  /** Yêu cầu trả về JSON */
+  json?: boolean
   idleTimeoutMs: number
   /** Thời gian chờ tối đa cho đoạn chữ ĐẦU TIÊN (mặc định = idleTimeoutMs) */
   firstChunkTimeoutMs?: number
@@ -131,7 +133,8 @@ export async function runWithFallback(o: RunOptions): Promise<RunResult> {
           system: o.system,
           prompt: o.prompt,
           signal: controller.signal,
-          thinking
+          thinking,
+          json: o.json
         })) {
           if (controller.signal.aborted) break
           gotChunk = true

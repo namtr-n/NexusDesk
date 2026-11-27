@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { IPC } from '@shared/channels'
 import type { AiChunkEvent } from '@shared/ai'
+import type { PolishProgressEvent } from '@shared/polish'
 import type { NexusApi } from '@shared/ipc-contract'
 
 // Preload là "cửa giao tiếp" duy nhất giữa giao diện và main process.
@@ -49,6 +50,18 @@ const api: NexusApi = {
       ipcRenderer.on(IPC.ai.chunkEvent, handler)
       return () => {
         ipcRenderer.removeListener(IPC.ai.chunkEvent, handler)
+      }
+    }
+  },
+  polish: {
+    run: (input) => ipcRenderer.invoke(IPC.polish.run, input),
+    cancel: (input) => ipcRenderer.invoke(IPC.polish.cancel, input),
+    onProgress: (listener) => {
+      const handler = (_event: IpcRendererEvent, payload: PolishProgressEvent): void =>
+        listener(payload)
+      ipcRenderer.on(IPC.polish.progressEvent, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC.polish.progressEvent, handler)
       }
     }
   },

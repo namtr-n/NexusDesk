@@ -15,6 +15,7 @@ import {
   type AiStatus,
   type AiTestResult
 } from './ai'
+import type { PolishOutcome, PolishProgressEvent, PolishRunInput } from './polish'
 import {
   templateNameSchema,
   templateSpecSchema,
@@ -88,6 +89,7 @@ export type ActivityType =
   | 'format.checked'
   | 'format.fixed'
   | 'ai.analyzed'
+  | 'ai.polished'
 
 export interface ActivityEntry {
   id: number
@@ -273,6 +275,12 @@ export interface NexusApi {
     getAnalyses(input: DocumentIdInput): Promise<Result<AiAnalysis[]>>
     /** Đăng ký nhận đoạn chữ đang stream; trả về hàm hủy đăng ký */
     onChunk(listener: (event: AiChunkEvent) => void): () => void
+  }
+  polish: {
+    /** Hộp thoại "Lưu thành" → sửa định dạng + AI hiệu đính (Track Changes) → file mới */
+    run(input: PolishRunInput): Promise<Result<PolishOutcome>>
+    cancel(input: AiCancelInput): Promise<Result<boolean>>
+    onProgress(listener: (event: PolishProgressEvent) => void): () => void
   }
   templates: {
     list(): Promise<Result<FormatTemplateSummary[]>>

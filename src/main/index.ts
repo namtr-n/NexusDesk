@@ -11,6 +11,7 @@ import { createAiService } from './services/ai/ai-service'
 import { createGeminiClient } from './services/ai/gemini-client'
 import { createKeyStore, type Encryptor } from './services/ai/key-store'
 import { createSettingsStore } from './services/settings/settings-store'
+import { createPolishService } from './services/polish/polish-service'
 import { createDocumentService } from './services/documents/document-service'
 import { createFormatService } from './services/format/format-service'
 import { createTemplateService } from './services/format/template-service'
@@ -70,6 +71,8 @@ function bootstrap(): boolean {
       encryptionAvailable: () => safeStorage.isEncryptionAvailable()
     })
 
+    const polish = createPolishService({ documents, templates, ai, activity, logger })
+
     registerIpcHandlers({
       projects,
       activity,
@@ -77,6 +80,7 @@ function bootstrap(): boolean {
       format,
       templates,
       ai,
+      polish,
       pickDocumentFiles,
       pickTemplateFile,
       pickSavePath,

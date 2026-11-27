@@ -42,6 +42,12 @@ export const IPC = {
     /** Sự kiện main → giao diện: từng đoạn chữ AI vừa trả về */
     chunkEvent: 'ai:chunk'
   },
+  polish: {
+    run: 'polish:run',
+    cancel: 'polish:cancel',
+    /** Sự kiện main → giao diện: tiến độ hoàn thiện */
+    progressEvent: 'polish:progress'
+  },
   templates: {
     list: 'templates:list',
     get: 'templates:get',

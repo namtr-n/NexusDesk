@@ -50,6 +50,23 @@ export interface AiService {
   ): Promise<AiAnalysis>
   cancel(requestId: string): boolean
   getAnalyses(documentId: number): AiAnalysis[]
+  /**
+   * Gọi AI một lượt (không stream ra giao diện), dùng cho tác vụ nền như hiệu đính.
+   * Có thử lại / model dự phòng như các tác vụ khác, ghi thống kê vào ai_usage.
+   */
+  complete(req: CompleteRequest): Promise<{ model: string; content: string }>
+}
+
+export interface CompleteRequest {
+  /** Tên tác vụ ghi vào thống kê, ví dụ "polish" */
+  task: string
+  system: string
+  prompt: string
+  /** Yêu cầu Gemini trả về JSON */
+  json?: boolean
+  documentId?: number | null
+  /** Dùng để hủy giữa chừng */
+  control: RunControl
 }
 
 export interface AiServiceDeps {
@@ -356,6 +373,56 @@ export function createAiService(deps: AiServiceDeps): AiService {
         })
         return toAnalysis(row)
       })
+    },
+
+    async complete({ task, system, prompt, json, documentId, control }) {
+      const c = client()
+      const { models, auto } = await modelPlan(c)
+      const start = Date.now()
+      try {
+        const r = await runWithFallback({
+          client: c,
+          models,
+          system,
+          prompt,
+          json,
+          thinking: 'low',
+          idleTimeoutMs: idleTimeout,
+          firstChunkTimeoutMs: firstChunkTimeout,
+          retryDelaysMs,
+          control,
+          onAttemptFailed: logAttempt
+        })
+        rememberHealthy(auto, r.model)
+        recordUsage({
+          task,
+          model: r.model,
+          documentId: documentId ?? null,
+          inputTokens: r.usage.inputTokens,
+          outputTokens: r.usage.outputTokens,
+          durationMs: Date.now() - start,
+          status: 'ok',
+          error: null,
+          createdAt: Date.now()
+        })
+        return { model: r.model, content: r.content }
+      } catch (err) {
+        const cancelled = err instanceof RunError && err.kind === 'cancelled'
+        const message = runErrorMessage(err, models[0])
+        const usage = err instanceof RunError ? err.usage : { inputTokens: 0, outputTokens: 0 }
+        recordUsage({
+          task,
+          model: err instanceof RunError ? err.model : models[0],
+          documentId: documentId ?? null,
+          inputTokens: usage.inputTokens,
+          outputTokens: usage.outputTokens,
+          durationMs: Date.now() - start,
+          status: cancelled ? 'cancelled' : 'error',
+          error: message,
+          createdAt: Date.now()
+        })
+        throw new UserError(message)
+      }
     },
 
     cancel(requestId) {
