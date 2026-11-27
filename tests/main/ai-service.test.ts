@@ -104,7 +104,12 @@ describe('AiService', () => {
 
   it('key: lưu dạng mã hóa, giao diện chỉ biết có/không', () => {
     const { ai } = make(noStream)
-    expect(ai.getStatus()).toEqual({ hasKey: false, model: null, encryptionAvailable: true })
+    expect(ai.getStatus()).toEqual({
+      hasKey: false,
+      model: null,
+      activeModel: null,
+      encryptionAvailable: true
+    })
     expect(ai.setKey(KEY)).toMatchObject({ hasKey: true })
     // Trạng thái trả về không chứa key
     expect(JSON.stringify(ai.getStatus())).not.toContain(KEY)
@@ -141,7 +146,8 @@ describe('AiService', () => {
     })
     expect(calls[0].apiKey).toBe(KEY)
     expect(calls[0].req.prompt).toContain('<tai_lieu>\nNội dung báo cáo thử nghiệm')
-    expect(ai.getStatus().model).toBe('gemini-3.8-flash')
+    // Chế độ tự động: KHÔNG lưu model vào cài đặt, chỉ ghi nhận model đang chạy tốt
+    expect(ai.getStatus()).toMatchObject({ model: null, activeModel: 'gemini-3.8-flash' })
     expect(ai.getAnalyses(docId)).toEqual([result])
     expect(usageRows()).toEqual([
       expect.objectContaining({
@@ -153,14 +159,33 @@ describe('AiService', () => {
     ])
   })
 
-  it('model chọn tay được ưu tiên', async () => {
-    const { ai, calls } = make(async function* () {
+  it('model cố định: chỉ dùng đúng model đó, quá tải cũng không tự đổi', async () => {
+    const { ai, calls } = make(async function* (req) {
+      if (req.model === 'gemini-2.5-flash') {
+        yield* []
+        throw Object.assign(new Error('high demand'), { status: 503 })
+      }
       yield { text: 'ok' }
     })
     ai.setKey(KEY)
     ai.setModel('gemini-2.5-flash')
-    await ai.analyze(docId, 'style', 'req-00000002', () => {})
-    expect(calls[0].req.model).toBe('gemini-2.5-flash')
+    await expect(ai.analyze(docId, 'style', 'req-00000002', () => {})).rejects.toThrow('bận')
+    expect(new Set(calls.map((c) => c.req.model))).toEqual(new Set(['gemini-2.5-flash']))
+  })
+
+  it('tự động: hạ dần qua mọi bản Flash cho tới khi dùng được', async () => {
+    const { ai, calls } = make(async function* (req) {
+      if (req.model !== 'gemini-2.5-flash') {
+        yield* []
+        throw Object.assign(new Error('high demand'), { status: 429 })
+      }
+      yield { text: 'ok' }
+    })
+    ai.setKey(KEY)
+    const r = await ai.analyze(docId, 'style', 'req-00000020', () => {})
+    expect(r.model).toBe('gemini-2.5-flash')
+    // 429 chuyển model ngay; bản lite không nằm trong danh sách
+    expect(calls.map((c) => c.req.model)).toEqual(['gemini-3.8-flash', 'gemini-2.5-flash'])
   })
 
   it('hủy giữa chừng: dừng stream, báo "Đã hủy", ghi thống kê cancelled', async () => {

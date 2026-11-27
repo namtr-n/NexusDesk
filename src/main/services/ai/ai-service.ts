@@ -32,8 +32,6 @@ export const IDLE_TIMEOUT_MS = 90_000
 export const FIRST_CHUNK_TIMEOUT_MS = 40_000
 /** Chờ trước lần thử lại cùng model khi Gemini quá tải (5xx): thử thêm 1 lần */
 export const RETRY_DELAYS_MS = [3_000]
-/** Số model dự phòng tối đa */
-const MAX_FALLBACKS = 2
 /** Nhớ model dự phòng vừa chạy tốt trong bao lâu (tránh thử lại model đang quá tải) */
 const HEALTHY_MODEL_TTL_MS = 30 * 60_000
 
@@ -138,32 +136,34 @@ export function createAiService(deps: AiServiceDeps): AiService {
   )
   const running = new Map<string, RunControl>()
   let modelCache: AiModelOption[] | null = null
+  /** Chế độ tự động: model vừa chạy tốt gần đây (để lần sau đi thẳng vào, khỏi dò lại) */
+  let healthy: { model: string; at: number } | null = null
 
-  let healthy: { primary: string; model: string; at: number } | null = null
-
-  /** Các bản Flash ổn định khác (mới nhất trước) để dự phòng khi model chính quá tải */
-  async function fallbackModels(c: AiClient, primary: string): Promise<string[]> {
-    try {
-      modelCache ??= await listModels(c)
-    } catch {
-      return []
+  /**
+   * Danh sách model sẽ thử theo thứ tự.
+   * - Cố định (đã chọn model trong Cài đặt): chỉ đúng model đó, không tự đổi.
+   * - Tự động: mọi bản gemini-X.Y-flash ổn định, mới nhất trước; quá tải / lỗi thì hạ dần
+   *   xuống bản thấp hơn cho tới khi dùng được. Model vừa chạy tốt (trong 30 phút) được thử trước.
+   */
+  async function modelPlan(c: AiClient): Promise<{ models: string[]; auto: boolean }> {
+    const fixed = settings.get(MODEL_KEY)
+    if (fixed) return { models: [fixed], auto: false }
+    modelCache ??= await listModels(c)
+    let list = stableFlashModels(modelCache)
+    if (list.length === 0) {
+      const any = pickDefaultModel(modelCache)
+      list = any ? [any] : []
     }
-    return stableFlashModels(modelCache)
-      .filter((id) => id !== primary)
-      .slice(0, MAX_FALLBACKS)
+    if (list.length === 0) throw new UserError('Tài khoản không có model Gemini nào dùng được.')
+    if (healthy && Date.now() - healthy.at < HEALTHY_MODEL_TTL_MS && list.includes(healthy.model)) {
+      const first = healthy.model
+      list = [first, ...list.filter((m) => m !== first)]
+    }
+    return { models: list, auto: true }
   }
 
-  /** Thứ tự model sẽ thử: model dự phòng vừa chạy tốt (nếu còn hạn) → model chính → dự phòng */
-  async function candidateModels(c: AiClient, primary: string): Promise<string[]> {
-    const list = [primary, ...(await fallbackModels(c, primary))]
-    if (healthy && healthy.primary === primary && Date.now() - healthy.at < HEALTHY_MODEL_TTL_MS) {
-      return [healthy.model, ...list.filter((m) => m !== healthy!.model)]
-    }
-    return list
-  }
-
-  function rememberHealthy(primary: string, used: string): void {
-    healthy = used === primary ? null : { primary, model: used, at: Date.now() }
+  function rememberHealthy(auto: boolean, used: string): void {
+    if (auto) healthy = { model: used, at: Date.now() }
   }
 
   function logAttempt(model: string, attempt: number, error: unknown): void {
@@ -198,9 +198,12 @@ export function createAiService(deps: AiServiceDeps): AiService {
   }
 
   function status(): AiStatus {
+    const model = settings.get(MODEL_KEY) ?? null
     return {
       hasKey: keys.hasKey(),
-      model: settings.get(MODEL_KEY) ?? null,
+      model,
+      activeModel:
+        !model && healthy && Date.now() - healthy.at < HEALTHY_MODEL_TTL_MS ? healthy.model : null,
       encryptionAvailable: deps.encryptionAvailable()
     }
   }
@@ -220,16 +223,6 @@ export function createAiService(deps: AiServiceDeps): AiService {
     } catch (err) {
       throw new UserError(describeAiError(err, '(danh sách model)'))
     }
-  }
-
-  /** Model đang chọn; nếu chưa chọn thì tự chọn bản Flash mới nhất và lưu lại. */
-  async function resolveModel(c: AiClient): Promise<string> {
-    const saved = settings.get(MODEL_KEY)
-    if (saved) return saved
-    const picked = pickDefaultModel(await listModels(c))
-    if (!picked) throw new UserError('Tài khoản không có model Gemini nào dùng được.')
-    settings.set(MODEL_KEY, picked)
-    return picked
   }
 
   function recordUsage(values: typeof aiUsage.$inferInsert): void {
@@ -263,12 +256,13 @@ export function createAiService(deps: AiServiceDeps): AiService {
 
     async test() {
       const c = client()
-      const primary = await resolveModel(c)
+      const { models, auto } = await modelPlan(c)
+      const primary = models[0]
       const start = Date.now()
       try {
         const r = await runWithFallback({
           client: c,
-          models: await candidateModels(c, primary),
+          models,
           system: 'Trả lời đúng một từ.',
           prompt: 'Trả lời: OK',
           thinking: 'low',
@@ -278,7 +272,7 @@ export function createAiService(deps: AiServiceDeps): AiService {
           control: {},
           onAttemptFailed: logAttempt
         })
-        rememberHealthy(primary, r.model)
+        rememberHealthy(auto, r.model)
         return { model: r.model, latencyMs: Date.now() - start }
       } catch (err) {
         throw new UserError(runErrorMessage(err, primary))
@@ -293,7 +287,8 @@ export function createAiService(deps: AiServiceDeps): AiService {
       if (!text.trim()) throw new UserError('Tài liệu không có nội dung chữ để AI phân tích.')
 
       const c = client()
-      const primary = await resolveModel(c)
+      const { models, auto } = await modelPlan(c)
+      const primary = models[0]
       const { system, prompt, truncated } = buildPrompt(task, doc.name, text)
       const control: RunControl = {}
       running.set(requestId, control)
@@ -303,7 +298,7 @@ export function createAiService(deps: AiServiceDeps): AiService {
       try {
         result = await runWithFallback({
           client: c,
-          models: await candidateModels(c, primary),
+          models,
           system,
           prompt,
           thinking: 'low',
@@ -335,7 +330,7 @@ export function createAiService(deps: AiServiceDeps): AiService {
       }
 
       const { model, content, usage } = result
-      rememberHealthy(primary, model)
+      rememberHealthy(auto, model)
       const createdAt = Date.now()
       return db.transaction(() => {
         const row = db

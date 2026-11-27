@@ -157,7 +157,7 @@ export function AiSettingsPanel() {
                       disabled={busy !== null}
                       className="w-72"
                     >
-                      <option value={AUTO}>Tự động (bản Flash mới nhất)</option>
+                      <option value={AUTO}>Tự động (tìm model đang dùng được)</option>
                       {status.model && !models.some((m) => m.id === status.model) && (
                         <option value={status.model}>{status.model}</option>
                       )}
@@ -170,9 +170,23 @@ export function AiSettingsPanel() {
                   ) : (
                     <>
                       {status.model ? (
-                        <span className="font-mono text-[12px]">{status.model}</span>
+                        <span>
+                          <span className="font-mono text-[12px]">{status.model}</span>
+                          <span className="ml-1.5 text-[12px] text-muted">(cố định)</span>
+                        </span>
                       ) : (
-                        <span className="text-muted">Tự động (bản Flash mới nhất)</span>
+                        <span className="text-muted">
+                          Tự động
+                          {status.activeModel && (
+                            <>
+                              {' '}
+                              · đang dùng{' '}
+                              <span className="font-mono text-[12px] text-text">
+                                {status.activeModel}
+                              </span>
+                            </>
+                          )}
+                        </span>
                       )}
                       <Button onClick={loadModels} disabled={busy !== null}>
                         {busy === 'models' ? 'Đang tải…' : 'Đổi model'}
@@ -181,6 +195,11 @@ export function AiSettingsPanel() {
                   )}
                 </div>
               </div>
+              <p className="-mt-2 ml-[176px] text-[12px] text-muted">
+                <b className="text-text/80">Tự động:</b> thử bản Flash mới nhất, nếu Google báo quá
+                tải hoặc lỗi thì tự hạ dần xuống bản cũ hơn cho tới khi dùng được.{' '}
+                <b className="text-text/80">Chọn một model cụ thể:</b> chỉ dùng đúng model đó.
+              </p>
               <div className="grid grid-cols-[160px_minmax(0,1fr)] items-center gap-4">
                 <span>Kết nối</span>
                 <div>

@@ -55,8 +55,10 @@ export const modelIdSchema = z
 
 export interface AiStatus {
   hasKey: boolean
-  /** Model đang dùng; null = chưa chọn (sẽ tự chọn bản Flash mới nhất) */
+  /** Model cố định đã chọn; null = tự động (thử Flash mới nhất, quá tải thì hạ dần) */
   model: string | null
+  /** Chế độ tự động: model vừa chạy tốt gần đây (null nếu chưa gọi lần nào) */
+  activeModel: string | null
   encryptionAvailable: boolean
 }
 
