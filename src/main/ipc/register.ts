@@ -8,6 +8,7 @@ import {
   documentImportSchema,
   documentListSchema,
   documentSetProjectSchema,
+  formatExportSchema,
   projectCreateSchema,
   projectRemoveSchema,
   projectUpdateSchema,
@@ -16,7 +17,9 @@ import {
 } from '@shared/ipc-contract'
 import { logger } from '../logger'
 import type { ActivityRepository } from '../services/activity/activity-repository'
+import { formatRulesSchema, type ReportFormat } from '@shared/format'
 import type { DocumentService } from '../services/documents/document-service'
+import type { FormatService } from '../services/format/format-service'
 import type { ProjectService } from '../services/projects/project-service'
 import { createHandler } from './handler'
 
@@ -25,8 +28,11 @@ export interface IpcDependencies {
   activity: ActivityRepository
   documents: DocumentService
   appInfo: () => AppInfo
+  format: FormatService
   /** Hiện hộp thoại chọn file của Windows; trả [] nếu người dùng bấm Hủy */
   pickDocumentFiles: () => Promise<string[]>
+  /** Hiện hộp thoại "Lưu thành"; trả null nếu người dùng bấm Hủy */
+  pickSavePath: (defaultName: string, format: ReportFormat) => Promise<string | null>
 }
 
 const noInput = z.undefined()
@@ -78,4 +84,17 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   register(IPC.documents.setProject, documentSetProjectSchema, (input) =>
     deps.documents.setProject(input.id, input.projectId)
   )
+
+  register(IPC.format.getRules, noInput, () => deps.format.getRules())
+  register(IPC.format.saveRules, formatRulesSchema, (rules) => deps.format.saveRules(rules))
+  register(IPC.format.resetRules, noInput, () => deps.format.resetRules())
+  register(IPC.format.check, documentIdSchema, (input) => deps.format.check(input.id))
+  register(IPC.format.getLatest, documentIdSchema, (input) => deps.format.getLatest(input.id))
+  register(IPC.format.exportReport, formatExportSchema, async ({ documentId, format }) => {
+    const name = deps.format.suggestReportName(documentId, format)
+    const target = await deps.pickSavePath(name, format)
+    if (!target) return { cancelled: true, path: null }
+    const path = await deps.format.exportReport(documentId, format, target)
+    return { cancelled: false, path }
+  })
 }

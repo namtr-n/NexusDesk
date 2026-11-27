@@ -41,8 +41,11 @@ export interface DocumentService {
   get(id: number): DocumentDetail
   remove(id: number): Promise<{ id: number }>
   setProject(id: number, projectId: number | null): DocumentSummary
+  getSummary(id: number): DocumentSummary
   /** Đường dẫn bản sao làm việc (dùng cho kiểm tra định dạng, AI...) */
   getStoredPath(id: number): string
+  /** Đường dẫn file gốc lúc nhập (chỉ để so sánh, KHÔNG được ghi vào) */
+  getSourcePath(id: number): string
 }
 
 const summaryColumns = {
@@ -237,6 +240,18 @@ export function createDocumentService(deps: DocumentServiceDeps): DocumentServic
         .get()
       if (!row) throw new UserError(NOT_FOUND)
       return join(storageDir, row.storedFile)
+    },
+
+    getSummary: findSummary,
+
+    getSourcePath(id) {
+      const row = db
+        .select({ sourcePath: documents.sourcePath })
+        .from(documents)
+        .where(eq(documents.id, id))
+        .get()
+      if (!row) throw new UserError(NOT_FOUND)
+      return row.sourcePath
     }
   }
 }

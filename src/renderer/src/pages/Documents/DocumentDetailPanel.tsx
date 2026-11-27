@@ -6,6 +6,7 @@ import { Button, ErrorBanner, Loading } from '@renderer/components/ui'
 import { useAsyncData } from '@renderer/hooks/useAsyncData'
 import { errorMessage, unwrap } from '@renderer/lib/api'
 import { formatBytes, formatDateTime, formatNumber } from '@renderer/lib/format'
+import { FormatCheckPanel } from './FormatCheckPanel'
 import { KindBadge } from './KindBadge'
 
 interface Props {
@@ -21,6 +22,7 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved }: Prop
   const state = useAsyncData(load, version)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<'format' | 'content'>('format')
 
   if (state.status === 'loading')
     return (
@@ -113,8 +115,21 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved }: Prop
         )}
       </div>
 
+      {doc.kind === 'docx' && (
+        <div className="flex gap-1 border-b border-border px-4">
+          <Tab active={tab === 'format'} onClick={() => setTab('format')}>
+            Kiểm tra định dạng
+          </Tab>
+          <Tab active={tab === 'content'} onClick={() => setTab('content')}>
+            Nội dung
+          </Tab>
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {doc.text ? (
+        {doc.kind === 'docx' && tab === 'format' ? (
+          <FormatCheckPanel documentId={doc.id} />
+        ) : doc.text ? (
           <>
             <pre className="font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-text/90 select-text">
               {doc.text}
@@ -138,6 +153,30 @@ function Panel({ children }: { children: React.ReactNode }) {
     <section className="flex max-h-[calc(100vh-180px)] flex-col overflow-hidden rounded-lg border border-border bg-surface">
       {children}
     </section>
+  )
+}
+
+function Tab({
+  active,
+  onClick,
+  children
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`-mb-px border-b-2 px-3 py-2.5 text-[13px] transition-colors ${
+        active
+          ? 'border-accent font-medium text-text'
+          : 'border-transparent text-muted hover:text-text'
+      }`}
+    >
+      {children}
+    </button>
   )
 }
 

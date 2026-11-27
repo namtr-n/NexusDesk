@@ -5,6 +5,7 @@
  * - Kiểu dữ liệu trả về và interface NexusApi (window.nexus).
  */
 import { z } from 'zod'
+import type { FormatCheckResult, FormatRules } from './format'
 
 /** Mọi lời gọi IPC đều trả về dạng này: thành công kèm data, hoặc thất bại kèm thông báo lỗi. */
 export type Result<T> = { ok: true; data: T } | { ok: false; error: string }
@@ -67,6 +68,7 @@ export type ActivityType =
   | 'project.deleted'
   | 'document.imported'
   | 'document.deleted'
+  | 'format.checked'
 
 export interface ActivityEntry {
   id: number
@@ -126,6 +128,19 @@ export interface ImportResult {
   skipped: { name: string; reason: string }[]
 }
 
+// ---------- Kiểm tra định dạng ----------
+
+export const formatExportSchema = z.object({
+  documentId: entityId,
+  format: z.enum(['docx', 'md'])
+})
+export type FormatExportInput = z.input<typeof formatExportSchema>
+
+export interface ExportResult {
+  cancelled: boolean
+  path: string | null
+}
+
 // ---------- Thông tin app ----------
 
 export interface AppInfo {
@@ -157,5 +172,14 @@ export interface NexusApi {
     get(input: DocumentIdInput): Promise<Result<DocumentDetail>>
     remove(input: DocumentIdInput): Promise<Result<{ id: number }>>
     setProject(input: DocumentSetProjectInput): Promise<Result<DocumentSummary>>
+  }
+  format: {
+    getRules(): Promise<Result<FormatRules>>
+    saveRules(input: FormatRules): Promise<Result<FormatRules>>
+    resetRules(): Promise<Result<FormatRules>>
+    check(input: DocumentIdInput): Promise<Result<FormatCheckResult>>
+    getLatest(input: DocumentIdInput): Promise<Result<FormatCheckResult | null>>
+    /** Mở hộp thoại "Lưu thành" (do main hiện) rồi ghi báo cáo */
+    exportReport(input: FormatExportInput): Promise<Result<ExportResult>>
   }
 }

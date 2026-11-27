@@ -21,5 +21,13 @@ export const IPC = {
     get: 'documents:get',
     remove: 'documents:remove',
     setProject: 'documents:set-project'
+  },
+  format: {
+    getRules: 'format:get-rules',
+    saveRules: 'format:save-rules',
+    resetRules: 'format:reset-rules',
+    check: 'format:check',
+    getLatest: 'format:get-latest',
+    exportReport: 'format:export-report'
   }
 } as const

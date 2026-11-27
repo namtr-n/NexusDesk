@@ -63,16 +63,31 @@ Bản sao tài liệu: `%APPDATA%\Nexus Desk\documents\<uuid>.<kind>`. Xóa tài
 Đường dẫn file do main lấy từ hộp thoại Windows, renderer không bao giờ gửi đường dẫn.
 Kiểm thử tự động khi dev: `NEXUS_E2E_PICK="C:\a.docx|C:\b.pdf"` thay cho hộp thoại (bị bỏ qua khi app.isPackaged).
 
+### Đã có (GĐ 2B)
+
+| Bảng            | Cột chính                                                                               | Ghi chú                                      |
+| --------------- | --------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `settings`      | key, value (JSON), updated_at                                                           | `format.rules` = quy tắc định dạng đang dùng |
+| `format_checks` | id, document_id (cascade), checked_at, issue_count, rules_json, stats_json, issues_json | Lưu cả quy tắc lúc kiểm tra để báo cáo đúng  |
+
+### Bộ kiểm tra định dạng DOCX (`src/main/services/format/`)
+
+- `docx-model.ts`: mở zip, đọc `document.xml`, `styles.xml`, `theme/theme1.xml`; tính định dạng
+  hiệu lực theo tầng docDefaults → style (chuỗi basedOn) → pPr/rPr trực tiếp; font theme
+  (minorHAnsi...) tra trong theme. Nhận biết heading (outlineLvl hoặc tên "heading N"), bảng,
+  mục lục (sdt "Table of Contents" / style TOC), danh sách (numPr), section và lề trang.
+- `check.ts`: so với `FormatRules` (src/shared/format.ts). Phân loại đoạn: heading / chú thích
+  (style Caption hoặc "Hình/Bảng N...") / thân bài. Thân bài: cỡ chữ, giãn dòng, cách đoạn;
+  căn đều và thụt dòng chỉ xét đoạn ≥ 80 ký tự, không phải danh sách. Bảng: chỉ xét font.
+  Bỏ qua font ký hiệu (Symbol, Wingdings, Cambria Math) và chỉ số trên/dưới khi xét cỡ chữ.
+- `report.ts`: xuất Markdown và DOCX. `format-service.ts`: chặn ghi báo cáo đè file gốc/bản sao.
+- Đã thử với file do Word 365 tạo (theme Aptos, giãn 1,16): file đúng chuẩn 0 lỗi, file mặc định bắt đủ lỗi.
+- Kiểm thử tự động khi dev: `NEXUS_E2E_SAVE_DIR` thay cho hộp thoại "Lưu thành".
+
 ### Dự kiến (tạo khi tới giai đoạn tương ứng)
 
 | Bảng                   | GĐ  | Mục đích                                                                |
 | ---------------------- | --- | ----------------------------------------------------------------------- |
-| `documents`            | 2   | File đã nhập: tên, loại, đường dẫn bản sao làm việc, hash, project_id   |
-| `document_text`        | 2   | Nội dung text trích ra (tách riêng vì có thể rất lớn)                   |
-| `format_rule_sets`     | 2   | Bộ quy tắc định dạng (JSON), có preset báo cáo sinh viên                |
-| `format_checks`        | 2   | Một lần kiểm tra: document_id, rule_set_id, thời điểm, số lỗi           |
-| `format_issues`        | 2   | Từng lỗi: vị trí đoạn, trích dẫn, giá trị thực tế, giá trị mong muốn    |
-| `settings`             | 3   | Cài đặt dạng key/value. API key mã hóa bằng safeStorage                 |
 | `ai_usage`             | 3   | Mỗi lượt gọi AI: tác vụ, model, token vào/ra, thời gian, thành công/lỗi |
 | `ai_analyses`          | 3   | Kết quả AI phân tích tài liệu                                           |
 | `prompts`              | 4   | Prompt: tiêu đề, danh mục, tag, project_id                              |

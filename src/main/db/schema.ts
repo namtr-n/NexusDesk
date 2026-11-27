@@ -53,6 +53,30 @@ export const documents = sqliteTable(
   ]
 )
 
+/** Cài đặt dạng key → giá trị JSON (quy tắc định dạng, sau này: API key đã mã hóa...). */
+export const settings = sqliteTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull(),
+  updatedAt: integer('updated_at').notNull()
+})
+
+/** Mỗi lần kiểm tra định dạng một tài liệu (lưu cả quy tắc lúc kiểm tra để xuất báo cáo đúng). */
+export const formatChecks = sqliteTable(
+  'format_checks',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    documentId: integer('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    checkedAt: integer('checked_at').notNull(),
+    issueCount: integer('issue_count').notNull(),
+    rulesJson: text('rules_json').notNull(),
+    statsJson: text('stats_json').notNull(),
+    issuesJson: text('issues_json').notNull()
+  },
+  (t) => [index('format_checks_document_idx').on(t.documentId, t.checkedAt)]
+)
+
 /** Nội dung chữ trích từ tài liệu (tách bảng riêng vì có thể rất lớn). */
 export const documentText = sqliteTable('document_text', {
   documentId: integer('document_id')
