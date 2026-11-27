@@ -7,6 +7,7 @@ export const GENERIC_ERROR =
 
 export interface ErrorLogger {
   error(...args: unknown[]): void
+  warn?(...args: unknown[]): void
 }
 
 /**

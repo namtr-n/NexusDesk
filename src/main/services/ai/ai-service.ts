@@ -23,10 +23,19 @@ import type { SettingsStore } from '../settings/settings-store'
 import type { AiClient, AiClientFactory } from './gemini-client'
 import type { KeyStore } from './key-store'
 import { buildPrompt } from './prompts'
+import { RunError, runWithFallback, type RunControl } from './stream-runner'
 
 const MODEL_KEY = 'ai.model'
 /** Hủy nếu Gemini im lặng quá lâu giữa hai đoạn chữ */
 export const IDLE_TIMEOUT_MS = 90_000
+/** Chờ đoạn chữ đầu tiên tối đa bao lâu trước khi chuyển model dự phòng */
+export const FIRST_CHUNK_TIMEOUT_MS = 40_000
+/** Chờ trước lần thử lại cùng model khi Gemini quá tải (5xx): thử thêm 1 lần */
+export const RETRY_DELAYS_MS = [3_000]
+/** Số model dự phòng tối đa */
+const MAX_FALLBACKS = 2
+/** Nhớ model dự phòng vừa chạy tốt trong bao lâu (tránh thử lại model đang quá tải) */
+const HEALTHY_MODEL_TTL_MS = 30 * 60_000
 
 export interface AiService {
   getStatus(): AiStatus
@@ -55,16 +64,24 @@ export interface AiServiceDeps {
   clientFactory: AiClientFactory
   encryptionAvailable: () => boolean
   idleTimeoutMs?: number
+  firstChunkTimeoutMs?: number
+  retryDelaysMs?: number[]
+}
+
+/** Các model gemini-X.Y-flash ổn định, phiên bản mới nhất trước */
+export function stableFlashModels(models: AiModelOption[]): string[] {
+  return models
+    .map((m) => ({ id: m.id, v: /^gemini-(\d+(?:\.\d+)?)-flash$/.exec(m.id) }))
+    .filter((x) => x.v)
+    .sort((a, b) => Number(b.v![1]) - Number(a.v![1]))
+    .map((x) => x.id)
 }
 
 /** Chọn model Flash ổn định mới nhất (gemini-X.Y-flash), tránh bản lite / preview / exp. */
 export function pickDefaultModel(models: AiModelOption[]): string | null {
   const ids = models.map((m) => m.id)
-  const stable = ids
-    .map((id) => ({ id, m: /^gemini-(\d+(?:\.\d+)?)-flash$/.exec(id) }))
-    .filter((x) => x.m)
-    .sort((a, b) => Number(b.m![1]) - Number(a.m![1]))
-  if (stable[0]) return stable[0].id
+  const stable = stableFlashModels(models)
+  if (stable[0]) return stable[0]
   if (ids.includes('gemini-flash-latest')) return 'gemini-flash-latest'
   const anyFlash = ids.find(
     (id) => /flash/.test(id) && !/lite|preview|exp|image|tts|audio/.test(id)
@@ -114,7 +131,71 @@ const toAnalysis = (r: Row): AiAnalysis => ({
 export function createAiService(deps: AiServiceDeps): AiService {
   const { db, keys, settings, documents, activity, logger, clientFactory } = deps
   const idleTimeout = deps.idleTimeoutMs ?? IDLE_TIMEOUT_MS
-  const running = new Map<string, { controller: AbortController; reason?: 'user' | 'idle' }>()
+  const retryDelaysMs = deps.retryDelaysMs ?? RETRY_DELAYS_MS
+  const firstChunkTimeout = Math.min(
+    deps.firstChunkTimeoutMs ?? FIRST_CHUNK_TIMEOUT_MS,
+    idleTimeout
+  )
+  const running = new Map<string, RunControl>()
+  let modelCache: AiModelOption[] | null = null
+
+  let healthy: { primary: string; model: string; at: number } | null = null
+
+  /** Các bản Flash ổn định khác (mới nhất trước) để dự phòng khi model chính quá tải */
+  async function fallbackModels(c: AiClient, primary: string): Promise<string[]> {
+    try {
+      modelCache ??= await listModels(c)
+    } catch {
+      return []
+    }
+    return stableFlashModels(modelCache)
+      .filter((id) => id !== primary)
+      .slice(0, MAX_FALLBACKS)
+  }
+
+  /** Thứ tự model sẽ thử: model dự phòng vừa chạy tốt (nếu còn hạn) → model chính → dự phòng */
+  async function candidateModels(c: AiClient, primary: string): Promise<string[]> {
+    const list = [primary, ...(await fallbackModels(c, primary))]
+    if (healthy && healthy.primary === primary && Date.now() - healthy.at < HEALTHY_MODEL_TTL_MS) {
+      return [healthy.model, ...list.filter((m) => m !== healthy!.model)]
+    }
+    return list
+  }
+
+  function rememberHealthy(primary: string, used: string): void {
+    healthy = used === primary ? null : { primary, model: used, at: Date.now() }
+  }
+
+  function logAttempt(model: string, attempt: number, error: unknown): void {
+    const e = error as { status?: unknown; kind?: unknown; message?: unknown }
+    logger.warn?.(
+      `[ai] ${model} lượt ${attempt + 1} thất bại: ${String(e?.status ?? e?.kind ?? '')} ${String(e?.message ?? '').slice(0, 120)}`
+    )
+  }
+
+  function runErrorMessage(err: unknown, primary: string): string {
+    const tried =
+      err instanceof RunError
+        ? err.triedModels
+        : ((err as { triedModels?: string[] })?.triedModels ?? [])
+    const suffix = tried.length > 1 ? ` (Đã thử: ${tried.join(', ')}.)` : ''
+    if (err instanceof RunError) {
+      switch (err.kind) {
+        case 'cancelled':
+          return 'Đã hủy.'
+        case 'idle':
+          return `Gemini không phản hồi sau ${Math.round(idleTimeout / 1000)} giây nên đã dừng. Hãy thử lại sau.${suffix}`
+        case 'blocked':
+          return `Gemini từ chối xử lý tài liệu này (lý do an toàn nội dung: ${String(err.original)}).`
+        case 'empty':
+          return 'Gemini không trả về nội dung. Hãy thử lại.'
+        default:
+          return describeAiError(err.original, err.model) + suffix
+      }
+    }
+    if (!(err as { status?: unknown })?.status) logger.error('[ai] lỗi không xác định', err)
+    return describeAiError(err, tried.at(-1) ?? primary) + suffix
+  }
 
   function status(): AiStatus {
     return {
@@ -182,27 +263,25 @@ export function createAiService(deps: AiServiceDeps): AiService {
 
     async test() {
       const c = client()
-      const model = await resolveModel(c)
+      const primary = await resolveModel(c)
       const start = Date.now()
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 30_000)
       try {
-        let got = false
-        for await (const chunk of c.stream({
-          model,
+        const r = await runWithFallback({
+          client: c,
+          models: await candidateModels(c, primary),
           system: 'Trả lời đúng một từ.',
           prompt: 'Trả lời: OK',
-          signal: controller.signal
-        })) {
-          if (chunk.text) got = true
-        }
-        if (!got) throw new Error('Gemini không trả về nội dung')
-        return { model, latencyMs: Date.now() - start }
+          thinking: 'low',
+          idleTimeoutMs: idleTimeout,
+          firstChunkTimeoutMs: firstChunkTimeout,
+          retryDelaysMs,
+          control: {},
+          onAttemptFailed: logAttempt
+        })
+        rememberHealthy(primary, r.model)
+        return { model: r.model, latencyMs: Date.now() - start }
       } catch (err) {
-        if (controller.signal.aborted) throw new UserError('Gemini không phản hồi sau 30 giây.')
-        throw new UserError(describeAiError(err, model))
-      } finally {
-        clearTimeout(timer)
+        throw new UserError(runErrorMessage(err, primary))
       }
     },
 
@@ -214,61 +293,34 @@ export function createAiService(deps: AiServiceDeps): AiService {
       if (!text.trim()) throw new UserError('Tài liệu không có nội dung chữ để AI phân tích.')
 
       const c = client()
-      const model = await resolveModel(c)
+      const primary = await resolveModel(c)
       const { system, prompt, truncated } = buildPrompt(task, doc.name, text)
-      const entry: { controller: AbortController; reason?: 'user' | 'idle' } = {
-        controller: new AbortController()
-      }
-      running.set(requestId, entry)
+      const control: RunControl = {}
+      running.set(requestId, control)
 
       const start = Date.now()
-      let content = ''
-      let usage = { inputTokens: 0, outputTokens: 0 }
-      let timer: ReturnType<typeof setTimeout> | undefined
-      const armIdle = (): void => {
-        clearTimeout(timer)
-        timer = setTimeout(() => {
-          entry.reason = 'idle'
-          entry.controller.abort()
-        }, idleTimeout)
-      }
-
+      let result
       try {
-        armIdle()
-        for await (const chunk of c.stream({
-          model,
+        result = await runWithFallback({
+          client: c,
+          models: await candidateModels(c, primary),
           system,
           prompt,
-          signal: entry.controller.signal
-        })) {
-          if (entry.controller.signal.aborted) break
-          armIdle()
-          if (chunk.blocked) {
-            throw new UserError(
-              `Gemini từ chối xử lý tài liệu này (lý do an toàn nội dung: ${chunk.blocked}).`
-            )
-          }
-          if (chunk.usage) usage = chunk.usage
-          if (chunk.text) {
-            content += chunk.text
-            onChunk(chunk.text)
-          }
-        }
-        if (entry.controller.signal.aborted) throw new Error('aborted')
-        if (!content.trim()) throw new UserError('Gemini không trả về nội dung. Hãy thử lại.')
+          thinking: 'low',
+          idleTimeoutMs: idleTimeout,
+          firstChunkTimeoutMs: firstChunkTimeout,
+          retryDelaysMs,
+          control,
+          onChunk,
+          onAttemptFailed: logAttempt
+        })
       } catch (err) {
-        const reason = entry.reason
-        const cancelled = reason === 'user'
-        const message = cancelled
-          ? 'Đã hủy.'
-          : reason === 'idle'
-            ? `Gemini không phản hồi sau ${Math.round(idleTimeout / 1000)} giây nên đã dừng. Hãy thử lại.`
-            : err instanceof UserError
-              ? err.message
-              : describeAiError(err, model)
+        const cancelled = err instanceof RunError && err.kind === 'cancelled'
+        const message = runErrorMessage(err, primary)
+        const usage = err instanceof RunError ? err.usage : { inputTokens: 0, outputTokens: 0 }
         recordUsage({
           task,
-          model,
+          model: err instanceof RunError ? err.model : primary,
           documentId,
           inputTokens: usage.inputTokens,
           outputTokens: usage.outputTokens,
@@ -277,15 +329,13 @@ export function createAiService(deps: AiServiceDeps): AiService {
           error: message,
           createdAt: Date.now()
         })
-        if (!cancelled && !(err instanceof UserError) && !reason) {
-          logger.error(`[ai] ${task} thất bại`, err)
-        }
         throw new UserError(message)
       } finally {
-        clearTimeout(timer)
         running.delete(requestId)
       }
 
+      const { model, content, usage } = result
+      rememberHealthy(primary, model)
       const createdAt = Date.now()
       return db.transaction(() => {
         const row = db
@@ -314,10 +364,10 @@ export function createAiService(deps: AiServiceDeps): AiService {
     },
 
     cancel(requestId) {
-      const entry = running.get(requestId)
-      if (!entry) return false
-      entry.reason = 'user'
-      entry.controller.abort()
+      const control = running.get(requestId)
+      if (!control) return false
+      control.reason = 'user'
+      control.abort?.()
       return true
     },
 

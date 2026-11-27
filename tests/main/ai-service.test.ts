@@ -88,6 +88,7 @@ describe('AiService', () => {
         logger,
         clientFactory: factory,
         encryptionAvailable: () => true,
+        retryDelaysMs: [1, 1],
         idleTimeoutMs
       })
       return { ai, calls }
@@ -211,6 +212,29 @@ describe('AiService', () => {
     })
     ai.setKey(KEY)
     await expect(ai.analyze(docId, 'overview', 'req-00000006', () => {})).rejects.toThrow('SAFETY')
+  })
+
+  it('model chính quá tải: dùng model dự phòng, lần sau đi thẳng vào model dự phòng', async () => {
+    const { ai, calls } = make(async function* (req) {
+      if (req.model === 'gemini-3.8-flash') {
+        yield* []
+        throw Object.assign(new Error('high demand'), { status: 503 })
+      }
+      yield { text: `từ ${req.model}` }
+    })
+    ai.setKey(KEY)
+    const first = await ai.analyze(docId, 'overview', 'req-00000010', () => {})
+    expect(first.model).toBe('gemini-2.5-flash')
+    // Test dùng retryDelaysMs [1, 1]: 1 lượt đầu + 2 lượt thử lại rồi mới chuyển model
+    expect(calls.map((c) => c.req.model)).toEqual([
+      'gemini-3.8-flash',
+      'gemini-3.8-flash',
+      'gemini-3.8-flash',
+      'gemini-2.5-flash'
+    ])
+    calls.length = 0
+    await ai.analyze(docId, 'style', 'req-00000011', () => {})
+    expect(calls.map((c) => c.req.model)).toEqual(['gemini-2.5-flash'])
   })
 
   it('kiểm tra kết nối', async () => {
