@@ -5,6 +5,7 @@
  */
 import { sqliteTable, integer, text, index } from 'drizzle-orm/sqlite-core'
 import type { DocumentKind, ExtractStatus } from '@shared/ipc-contract'
+import type { AiTask } from '@shared/ai'
 
 export const projects = sqliteTable('projects', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -94,6 +95,42 @@ export const formatChecks = sqliteTable(
     issuesJson: text('issues_json').notNull()
   },
   (t) => [index('format_checks_document_idx').on(t.documentId, t.checkedAt)]
+)
+
+/** Mỗi lượt gọi AI (để thống kê mức sử dụng, chi phí, lỗi). */
+export const aiUsage = sqliteTable(
+  'ai_usage',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    task: text('task').notNull(),
+    model: text('model').notNull(),
+    documentId: integer('document_id').references(() => documents.id, { onDelete: 'set null' }),
+    inputTokens: integer('input_tokens').notNull().default(0),
+    outputTokens: integer('output_tokens').notNull().default(0),
+    durationMs: integer('duration_ms').notNull(),
+    /** ok | error | cancelled */
+    status: text('status').notNull(),
+    error: text('error'),
+    createdAt: integer('created_at').notNull()
+  },
+  (t) => [index('ai_usage_created_at_idx').on(t.createdAt)]
+)
+
+/** Kết quả AI phân tích tài liệu (giữ lịch sử, giao diện hiện bản mới nhất mỗi tác vụ). */
+export const aiAnalyses = sqliteTable(
+  'ai_analyses',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    documentId: integer('document_id')
+      .notNull()
+      .references(() => documents.id, { onDelete: 'cascade' }),
+    task: text('task').$type<AiTask>().notNull(),
+    model: text('model').notNull(),
+    content: text('content').notNull(),
+    truncated: integer('truncated', { mode: 'boolean' }).notNull().default(false),
+    createdAt: integer('created_at').notNull()
+  },
+  (t) => [index('ai_analyses_document_idx').on(t.documentId, t.task, t.createdAt)]
 )
 
 /** Nội dung chữ trích từ tài liệu (tách bảng riêng vì có thể rất lớn). */

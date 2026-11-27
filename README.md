@@ -3,7 +3,7 @@
 Personal AI Workspace cho Windows: kiểm tra định dạng báo cáo DOCX, phân tích tài liệu bằng AI,
 thư viện prompt và kho tài liệu hỏi đáp.
 
-Trạng thái: Giai đoạn 2 xong (nhập tài liệu, kiểm tra định dạng DOCX, xuất báo cáo). Tiếp theo: Giai đoạn 3 (Gemini).
+Trạng thái: Giai đoạn 3 xong (Gemini: phân tích tài liệu). Tiếp theo: Giai đoạn 4 (thư viện prompt).
 
 ## Lệnh thường dùng
 

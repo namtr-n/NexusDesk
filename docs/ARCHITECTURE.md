@@ -92,17 +92,35 @@ Kiểm thử tự động khi dev: `NEXUS_E2E_PICK="C:\a.docx|C:\b.pdf"` thay ch
   học đúng, bài làm đúng mẫu 0 lỗi, bài sai mẫu bắt đủ 16 lỗi; báo cáo thật 613 đoạn: 0,12 s.
 - Kiểm thử tự động khi dev: `NEXUS_E2E_SAVE_DIR`, `NEXUS_E2E_PICK_TEMPLATE` thay cho hộp thoại.
 
+### Đã có (GĐ 3 – Gemini)
+
+| Bảng          | Cột chính                                                                                | Ghi chú                                |
+| ------------- | ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| `ai_usage`    | task, model, document_id (set null), input/output_tokens, duration_ms, status, error     | status: ok / error / cancelled         |
+| `ai_analyses` | document_id (cascade), task, model, content (Markdown), truncated, created_at            | Giao diện hiện bản mới nhất mỗi tác vụ |
+| `settings`    | `ai.apiKey` (base64 của bản mã hóa safeStorage/DPAPI), `ai.model` (null = tự chọn Flash) | Key không bao giờ rời main process     |
+
+AI (`src/main/services/ai/`):
+
+- `gemini-client.ts`: bọc `@google/genai` sau interface `AiClient` (test dùng client giả).
+- `key-store.ts`: mã hóa key bằng `safeStorage`; giải mã thất bại (chép DB sang máy khác) → báo nhập lại.
+- `ai-service.ts`: tự chọn model `gemini-X.Y-flash` mới nhất từ `models.list` (lưu vào `ai.model`);
+  stream qua IPC (`ai:chunk` main → renderer, kèm requestId); hủy bằng AbortController; tự dừng nếu
+  im lặng 90 giây; đổi lỗi 400/403/404/429/5xx/mạng sang tiếng Việt; ghi `ai_usage` mọi lượt.
+- `prompts.ts`: 3 tác vụ (tổng quan, chính tả, văn phong). Tài liệu bọc trong `<tai_lieu>`, system
+  prompt dặn bỏ qua chỉ dẫn bên trong tài liệu (chống prompt injection). Cắt tại 100.000 ký tự.
+- IPC handler nhận `ctx.send` để gửi sự kiện về đúng cửa sổ đã gọi.
+- Giao diện hiện câu trả lời bằng bộ Markdown tự viết (`lib/markdown.ts`), không có HTML thô.
+
 ### Dự kiến (tạo khi tới giai đoạn tương ứng)
 
-| Bảng                   | GĐ  | Mục đích                                                                |
-| ---------------------- | --- | ----------------------------------------------------------------------- |
-| `ai_usage`             | 3   | Mỗi lượt gọi AI: tác vụ, model, token vào/ra, thời gian, thành công/lỗi |
-| `ai_analyses`          | 3   | Kết quả AI phân tích tài liệu                                           |
-| `prompts`              | 4   | Prompt: tiêu đề, danh mục, tag, project_id                              |
-| `prompt_versions`      | 4   | Lịch sử phiên bản nội dung prompt                                       |
-| `prompts_fts`          | 4   | Bảng FTS5 để tìm kiếm prompt                                            |
-| `knowledge_chunks`     | 5   | Đoạn văn bản cắt từ tài liệu + vị trí nguồn (trang/đoạn)                |
-| `knowledge_chunks_fts` | 5   | Bảng FTS5 để truy hồi đoạn liên quan khi hỏi đáp                        |
+| Bảng                   | GĐ  | Mục đích                                                 |
+| ---------------------- | --- | -------------------------------------------------------- |
+| `prompts`              | 4   | Prompt: tiêu đề, danh mục, tag, project_id               |
+| `prompt_versions`      | 4   | Lịch sử phiên bản nội dung prompt                        |
+| `prompts_fts`          | 4   | Bảng FTS5 để tìm kiếm prompt                             |
+| `knowledge_chunks`     | 5   | Đoạn văn bản cắt từ tài liệu + vị trí nguồn (trang/đoạn) |
+| `knowledge_chunks_fts` | 5   | Bảng FTS5 để truy hồi đoạn liên quan khi hỏi đáp         |
 
 ### Thêm/sửa bảng
 

@@ -18,17 +18,23 @@ import {
   templateIdSchema,
   templatePresetSchema,
   templateUpdateSchema,
+  aiAnalyzeSchema,
+  aiCancelSchema,
+  aiSetKeySchema,
+  aiSetModelSchema,
   type AppInfo,
   type Result
 } from '@shared/ipc-contract'
+import type { AiChunkEvent } from '@shared/ai'
 import type { ReportFormat } from '@shared/format'
 import { logger } from '../logger'
 import type { ActivityRepository } from '../services/activity/activity-repository'
+import type { AiService } from '../services/ai/ai-service'
 import type { DocumentService } from '../services/documents/document-service'
 import type { FormatService } from '../services/format/format-service'
 import type { TemplateService } from '../services/format/template-service'
 import type { ProjectService } from '../services/projects/project-service'
-import { createHandler } from './handler'
+import { createHandler, type HandlerContext } from './handler'
 
 export interface IpcDependencies {
   projects: ProjectService
@@ -37,6 +43,7 @@ export interface IpcDependencies {
   appInfo: () => AppInfo
   format: FormatService
   templates: TemplateService
+  ai: AiService
   /** Hiện hộp thoại chọn file của Windows; trả [] nếu người dùng bấm Hủy */
   pickDocumentFiles: () => Promise<string[]>
   /** Hộp thoại chọn MỘT file DOCX mẫu; trả null nếu người dùng bấm Hủy */
@@ -58,7 +65,7 @@ function isTrustedSender(event: IpcMainInvokeEvent): boolean {
 function register<S extends z.ZodType, R>(
   channel: string,
   schema: S,
-  fn: (input: z.output<S>) => R | Promise<R>
+  fn: (input: z.output<S>, ctx: HandlerContext) => R | Promise<R>
 ): void {
   const handler = createHandler(channel, schema, fn, logger)
   ipcMain.handle(channel, (event, raw): Promise<Result<Awaited<R>>> | Result<never> => {
@@ -66,7 +73,12 @@ function register<S extends z.ZodType, R>(
       logger.warn(`[ipc] từ chối ${channel} từ nguồn lạ: ${event.senderFrame?.url}`)
       return { ok: false, error: 'Nguồn gọi không hợp lệ' }
     }
-    return handler(raw)
+    const sender = event.sender
+    return handler(raw, {
+      send: (ch, payload) => {
+        if (!sender.isDestroyed()) sender.send(ch, payload)
+      }
+    })
   })
 }
 
@@ -128,4 +140,19 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     deps.templates.setDefault(input.id)
   )
   register(IPC.templates.remove, templateIdSchema, (input) => deps.templates.remove(input.id))
+
+  register(IPC.ai.getStatus, noInput, () => deps.ai.getStatus())
+  register(IPC.ai.setKey, aiSetKeySchema, (input) => deps.ai.setKey(input.apiKey))
+  register(IPC.ai.removeKey, noInput, () => deps.ai.removeKey())
+  register(IPC.ai.setModel, aiSetModelSchema, (input) => deps.ai.setModel(input.model))
+  register(IPC.ai.listModels, noInput, () => deps.ai.listModels())
+  register(IPC.ai.test, noInput, () => deps.ai.test())
+  register(IPC.ai.analyze, aiAnalyzeSchema, (input, ctx) =>
+    deps.ai.analyze(input.documentId, input.task, input.requestId, (text) => {
+      const event: AiChunkEvent = { requestId: input.requestId, text }
+      ctx.send(IPC.ai.chunkEvent, event)
+    })
+  )
+  register(IPC.ai.cancel, aiCancelSchema, (input) => deps.ai.cancel(input.requestId))
+  register(IPC.ai.getAnalyses, documentIdSchema, (input) => deps.ai.getAnalyses(input.id))
 }

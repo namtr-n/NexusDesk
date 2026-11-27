@@ -6,6 +6,7 @@ import { Button, ErrorBanner, Loading } from '@renderer/components/ui'
 import { useAsyncData } from '@renderer/hooks/useAsyncData'
 import { errorMessage, unwrap } from '@renderer/lib/api'
 import { formatBytes, formatDateTime, formatNumber } from '@renderer/lib/format'
+import { AiAnalysisPanel } from './AiAnalysisPanel'
 import { FormatCheckPanel } from './FormatCheckPanel'
 import { KindBadge } from './KindBadge'
 
@@ -22,7 +23,7 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved }: Prop
   const state = useAsyncData(load, version)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [tab, setTab] = useState<'format' | 'content'>('format')
+  const [tab, setTab] = useState<'format' | 'ai' | 'content'>('format')
 
   if (state.status === 'loading')
     return (
@@ -40,6 +41,15 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved }: Prop
     )
 
   const doc = state.data
+  // Tab "Kiểm tra định dạng" chỉ có với DOCX, "Phân tích AI" chỉ khi có chữ
+  const activeTab =
+    tab === 'format' && doc.kind !== 'docx'
+      ? doc.text
+        ? 'ai'
+        : 'content'
+      : tab === 'ai' && !doc.text
+        ? 'content'
+        : tab
 
   async function changeProject(f: ProjectFilter) {
     setBusy(true)
@@ -115,20 +125,27 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved }: Prop
         )}
       </div>
 
-      {doc.kind === 'docx' && (
-        <div className="flex gap-1 border-b border-border px-4">
-          <Tab active={tab === 'format'} onClick={() => setTab('format')}>
+      <div className="flex gap-1 border-b border-border px-4">
+        {doc.kind === 'docx' && (
+          <Tab active={activeTab === 'format'} onClick={() => setTab('format')}>
             Kiểm tra định dạng
           </Tab>
-          <Tab active={tab === 'content'} onClick={() => setTab('content')}>
-            Nội dung
+        )}
+        {doc.text && (
+          <Tab active={activeTab === 'ai'} onClick={() => setTab('ai')}>
+            Phân tích AI
           </Tab>
-        </div>
-      )}
+        )}
+        <Tab active={activeTab === 'content'} onClick={() => setTab('content')}>
+          Nội dung
+        </Tab>
+      </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {doc.kind === 'docx' && tab === 'format' ? (
+        {activeTab === 'format' ? (
           <FormatCheckPanel documentId={doc.id} />
+        ) : activeTab === 'ai' ? (
+          <AiAnalysisPanel documentId={doc.id} />
         ) : doc.text ? (
           <>
             <pre className="font-sans text-[13px] leading-relaxed whitespace-pre-wrap text-text/90 select-text">

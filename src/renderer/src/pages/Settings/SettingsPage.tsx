@@ -2,6 +2,7 @@ import { ErrorBanner, Loading, PageHeader, Panel } from '@renderer/components/ui
 import { SettingsIcon } from '@renderer/components/icons'
 import { useAsyncData } from '@renderer/hooks/useAsyncData'
 import { unwrap } from '@renderer/lib/api'
+import { AiSettingsPanel } from './AiSettingsPanel'
 
 const loadInfo = () => unwrap(window.nexus.app.getInfo())
 
@@ -21,9 +22,10 @@ export function SettingsPage() {
     <>
       <PageHeader
         title="Cài đặt"
-        subtitle="Thông tin ứng dụng và nơi lưu dữ liệu. Quy định trình bày nằm ở trang Mẫu định dạng."
+        subtitle="Gemini AI, thông tin ứng dụng và nơi lưu dữ liệu. Quy định trình bày nằm ở trang Mẫu định dạng."
       />
       <div className="space-y-5">
+        <AiSettingsPanel />
         <Panel title="Ứng dụng" icon={<SettingsIcon />}>
           {info.status === 'loading' && <Loading />}
           {info.status === 'error' && <ErrorBanner message={info.error} />}
@@ -35,12 +37,6 @@ export function SettingsPage() {
               <Row label="File nhật ký" value={info.data.logPath} />
             </dl>
           )}
-        </Panel>
-        <Panel title="Gemini API key">
-          <p className="text-[13px] text-muted">
-            Sẽ có ở Giai đoạn 3. Key sẽ được mã hóa bằng cơ chế bảo mật của Windows và không bao giờ
-            hiện lại trên giao diện.
-          </p>
         </Panel>
       </div>
     </>

@@ -28,6 +28,19 @@ export const IPC = {
     exportReport: 'format:export-report',
     createTemplateFromDocument: 'format:create-template-from-document'
   },
+  ai: {
+    getStatus: 'ai:get-status',
+    setKey: 'ai:set-key',
+    removeKey: 'ai:remove-key',
+    setModel: 'ai:set-model',
+    listModels: 'ai:list-models',
+    test: 'ai:test',
+    analyze: 'ai:analyze',
+    cancel: 'ai:cancel',
+    getAnalyses: 'ai:get-analyses',
+    /** Sự kiện main → giao diện: từng đoạn chữ AI vừa trả về */
+    chunkEvent: 'ai:chunk'
+  },
   templates: {
     list: 'templates:list',
     get: 'templates:get',

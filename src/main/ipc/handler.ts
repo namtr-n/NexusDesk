@@ -16,19 +16,26 @@ export interface ErrorLogger {
  * 3. Bắt mọi lỗi: lỗi dành cho người dùng thì trả nguyên thông báo,
  *    lỗi khác thì ghi log và trả thông báo chung (không lộ chi tiết bên trong).
  */
+/** Thông tin về nơi gọi: dùng để gửi sự kiện (ví dụ stream AI) ngược lại đúng cửa sổ. */
+export interface HandlerContext {
+  send(channel: string, payload: unknown): void
+}
+
+const NO_CONTEXT: HandlerContext = { send: () => undefined }
+
 export function createHandler<S extends z.ZodType, R>(
   channel: string,
   schema: S,
-  fn: (input: z.output<S>) => R | Promise<R>,
+  fn: (input: z.output<S>, ctx: HandlerContext) => R | Promise<R>,
   logger: ErrorLogger
-): (raw: unknown) => Promise<Result<Awaited<R>>> {
-  return async (raw) => {
+): (raw: unknown, ctx?: HandlerContext) => Promise<Result<Awaited<R>>> {
+  return async (raw, ctx = NO_CONTEXT) => {
     const parsed = schema.safeParse(raw)
     if (!parsed.success) {
       return { ok: false, error: parsed.error.issues[0]?.message ?? 'Dữ liệu không hợp lệ' }
     }
     try {
-      return { ok: true, data: await fn(parsed.data) }
+      return { ok: true, data: await fn(parsed.data, ctx) }
     } catch (err) {
       if (err instanceof UserError) return { ok: false, error: err.message }
       logger.error(`[ipc] ${channel} thất bại`, err)

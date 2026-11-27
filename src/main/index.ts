@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, session } from 'electron'
+import { app, BrowserWindow, dialog, safeStorage, session } from 'electron'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
@@ -7,6 +7,10 @@ import { pickDocumentFiles, pickSavePath, pickTemplateFile } from './dialogs'
 import { registerIpcHandlers } from './ipc/register'
 import { getLogFilePath, logger } from './logger'
 import { createActivityRepository } from './services/activity/activity-repository'
+import { createAiService } from './services/ai/ai-service'
+import { createGeminiClient } from './services/ai/gemini-client'
+import { createKeyStore, type Encryptor } from './services/ai/key-store'
+import { createSettingsStore } from './services/settings/settings-store'
 import { createDocumentService } from './services/documents/document-service'
 import { createFormatService } from './services/format/format-service'
 import { createTemplateService } from './services/format/template-service'
@@ -49,12 +53,30 @@ function bootstrap(): boolean {
     templates.ensureDefault()
     const format = createFormatService({ db: database.db, documents, templates, activity, logger })
 
+    const settings = createSettingsStore(database.db)
+    const encryptor: Encryptor = {
+      isAvailable: () => safeStorage.isEncryptionAvailable(),
+      encrypt: (plain) => safeStorage.encryptString(plain),
+      decrypt: (data) => safeStorage.decryptString(data)
+    }
+    const ai = createAiService({
+      db: database.db,
+      keys: createKeyStore(settings, encryptor),
+      settings,
+      documents,
+      activity,
+      logger,
+      clientFactory: createGeminiClient,
+      encryptionAvailable: () => safeStorage.isEncryptionAvailable()
+    })
+
     registerIpcHandlers({
       projects,
       activity,
       documents,
       format,
       templates,
+      ai,
       pickDocumentFiles,
       pickTemplateFile,
       pickSavePath,

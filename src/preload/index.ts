@@ -1,5 +1,6 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { IPC } from '@shared/channels'
+import type { AiChunkEvent } from '@shared/ai'
 import type { NexusApi } from '@shared/ipc-contract'
 
 // Preload là "cửa giao tiếp" duy nhất giữa giao diện và main process.
@@ -30,6 +31,25 @@ const api: NexusApi = {
     exportReport: (input) => ipcRenderer.invoke(IPC.format.exportReport, input),
     createTemplateFromDocument: (input) =>
       ipcRenderer.invoke(IPC.format.createTemplateFromDocument, input)
+  },
+  ai: {
+    getStatus: () => ipcRenderer.invoke(IPC.ai.getStatus),
+    setKey: (input) => ipcRenderer.invoke(IPC.ai.setKey, input),
+    removeKey: () => ipcRenderer.invoke(IPC.ai.removeKey),
+    setModel: (input) => ipcRenderer.invoke(IPC.ai.setModel, input),
+    listModels: () => ipcRenderer.invoke(IPC.ai.listModels),
+    test: () => ipcRenderer.invoke(IPC.ai.test),
+    analyze: (input) => ipcRenderer.invoke(IPC.ai.analyze, input),
+    cancel: (input) => ipcRenderer.invoke(IPC.ai.cancel, input),
+    getAnalyses: (input) => ipcRenderer.invoke(IPC.ai.getAnalyses, input),
+    onChunk: (listener) => {
+      // Chỉ chuyển tiếp dữ liệu, không đưa đối tượng event của Electron sang giao diện
+      const handler = (_event: IpcRendererEvent, payload: AiChunkEvent): void => listener(payload)
+      ipcRenderer.on(IPC.ai.chunkEvent, handler)
+      return () => {
+        ipcRenderer.removeListener(IPC.ai.chunkEvent, handler)
+      }
+    }
   },
   templates: {
     list: () => ipcRenderer.invoke(IPC.templates.list),

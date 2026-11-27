@@ -6,6 +6,16 @@
  */
 import { z } from 'zod'
 import {
+  AI_TASKS,
+  apiKeySchema,
+  modelIdSchema,
+  type AiAnalysis,
+  type AiChunkEvent,
+  type AiModelOption,
+  type AiStatus,
+  type AiTestResult
+} from './ai'
+import {
   templateNameSchema,
   templateSpecSchema,
   type FormatCheckResult,
@@ -75,6 +85,7 @@ export type ActivityType =
   | 'document.imported'
   | 'document.deleted'
   | 'format.checked'
+  | 'ai.analyzed'
 
 export interface ActivityEntry {
   id: number
@@ -153,6 +164,24 @@ export const formatCheckSchema = z.object({
 })
 export type FormatCheckInput = z.input<typeof formatCheckSchema>
 
+// ---------- AI ----------
+
+const requestIdSchema = z.string().regex(/^[A-Za-z0-9-]{8,64}$/, 'Mã yêu cầu không hợp lệ')
+
+export const aiSetKeySchema = z.object({ apiKey: apiKeySchema })
+export const aiSetModelSchema = z.object({ model: modelIdSchema.nullable() })
+export const aiAnalyzeSchema = z.object({
+  documentId: entityId,
+  task: z.enum(AI_TASKS),
+  requestId: requestIdSchema
+})
+export const aiCancelSchema = z.object({ requestId: requestIdSchema })
+
+export type AiSetKeyInput = z.input<typeof aiSetKeySchema>
+export type AiSetModelInput = z.input<typeof aiSetModelSchema>
+export type AiAnalyzeInput = z.input<typeof aiAnalyzeSchema>
+export type AiCancelInput = z.input<typeof aiCancelSchema>
+
 // ---------- Mẫu định dạng ----------
 
 export const templateIdSchema = z.object({ id: entityId })
@@ -212,6 +241,22 @@ export interface NexusApi {
     exportReport(input: FormatExportInput): Promise<Result<ExportResult>>
     /** Học mẫu định dạng từ một tài liệu DOCX trong thư viện */
     createTemplateFromDocument(input: DocumentIdInput): Promise<Result<FormatTemplate>>
+  }
+  ai: {
+    getStatus(): Promise<Result<AiStatus>>
+    /** Lưu key (đã mã hóa). Key không bao giờ được trả ngược lại giao diện. */
+    setKey(input: AiSetKeyInput): Promise<Result<AiStatus>>
+    removeKey(): Promise<Result<AiStatus>>
+    /** null = tự chọn bản Flash mới nhất */
+    setModel(input: AiSetModelInput): Promise<Result<AiStatus>>
+    listModels(): Promise<Result<AiModelOption[]>>
+    test(): Promise<Result<AiTestResult>>
+    /** Chạy phân tích; trong lúc chạy, từng đoạn chữ được gửi qua onChunk */
+    analyze(input: AiAnalyzeInput): Promise<Result<AiAnalysis>>
+    cancel(input: AiCancelInput): Promise<Result<boolean>>
+    getAnalyses(input: DocumentIdInput): Promise<Result<AiAnalysis[]>>
+    /** Đăng ký nhận đoạn chữ đang stream; trả về hàm hủy đăng ký */
+    onChunk(listener: (event: AiChunkEvent) => void): () => void
   }
   templates: {
     list(): Promise<Result<FormatTemplateSummary[]>>
