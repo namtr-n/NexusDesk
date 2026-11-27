@@ -1,0 +1,18 @@
+/**
+ * Tên các "kênh" IPC. Giao diện và main process gọi nhau qua những tên này.
+ * File này KHÔNG import thư viện nào để preload (chạy trong sandbox) dùng được.
+ */
+export const IPC = {
+  app: {
+    getInfo: 'app:get-info'
+  },
+  projects: {
+    list: 'projects:list',
+    create: 'projects:create',
+    update: 'projects:update',
+    remove: 'projects:remove'
+  },
+  activity: {
+    listRecent: 'activity:list-recent'
+  }
+} as const

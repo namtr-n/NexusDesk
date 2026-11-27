@@ -1,7 +1,22 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
+import { IPC } from '@shared/channels'
+import type { NexusApi } from '@shared/ipc-contract'
 
 // Preload là "cửa giao tiếp" duy nhất giữa giao diện và main process.
-// Chỉ mở đúng những hàm cần thiết qua window.nexus, không bao giờ mở ipcRenderer thô.
-const api = {}
+// Chỉ mở đúng những hàm dưới đây qua window.nexus, không bao giờ mở ipcRenderer thô.
+const api: NexusApi = {
+  app: {
+    getInfo: () => ipcRenderer.invoke(IPC.app.getInfo)
+  },
+  projects: {
+    list: () => ipcRenderer.invoke(IPC.projects.list),
+    create: (input) => ipcRenderer.invoke(IPC.projects.create, input),
+    update: (input) => ipcRenderer.invoke(IPC.projects.update, input),
+    remove: (input) => ipcRenderer.invoke(IPC.projects.remove, input)
+  },
+  activity: {
+    listRecent: (input) => ipcRenderer.invoke(IPC.activity.listRecent, input)
+  }
+}
 
 contextBridge.exposeInMainWorld('nexus', api)

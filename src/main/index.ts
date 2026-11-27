@@ -1,5 +1,11 @@
-import { app, BrowserWindow, session } from 'electron'
+import { app, BrowserWindow, dialog, session } from 'electron'
+import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
+import { openDatabase } from './db/client'
+import { registerIpcHandlers } from './ipc/register'
+import { getLogFilePath, logger } from './logger'
+import { createActivityRepository } from './services/activity/activity-repository'
+import { createProjectService } from './services/projects/project-service'
 import { createMainWindow } from './window'
 
 // Chỉ cho chạy một bản app cùng lúc (tránh hai bản cùng ghi vào database).
@@ -15,6 +21,44 @@ app.on('second-instance', () => {
   }
 })
 
+/** Mở database, tạo các service và đăng ký IPC. Trả về false nếu thất bại. */
+function bootstrap(): boolean {
+  const dataPath = app.getPath('userData')
+  const databasePath = join(dataPath, 'nexus-desk.db')
+  // Khi dev: thư mục drizzle/ ở gốc project. Khi cài bản .exe: nằm trong resources.
+  const migrationsFolder = app.isPackaged
+    ? join(process.resourcesPath, 'drizzle')
+    : join(app.getAppPath(), 'drizzle')
+
+  try {
+    const database = openDatabase(databasePath, migrationsFolder)
+    app.on('will-quit', () => database.close())
+
+    const activity = createActivityRepository(database.db)
+    const projects = createProjectService(database.db, activity)
+
+    registerIpcHandlers({
+      projects,
+      activity,
+      appInfo: () => ({
+        version: app.getVersion(),
+        dataPath,
+        databasePath,
+        logPath: getLogFilePath()
+      })
+    })
+    logger.info(`Nexus Desk ${app.getVersion()} khởi động, database: ${databasePath}`)
+    return true
+  } catch (err) {
+    logger.error('Không mở được database', err)
+    dialog.showErrorBox(
+      'Nexus Desk không khởi động được',
+      `Không mở được cơ sở dữ liệu.\n\n${String(err)}\n\nNhật ký: ${getLogFilePath()}`
+    )
+    return false
+  }
+}
+
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.nexusdesk.app')
 
@@ -23,6 +67,11 @@ app.whenReady().then(() => {
 
   // F12 mở DevTools khi dev; chặn Ctrl+R khi chạy bản thật.
   app.on('browser-window-created', (_, window) => optimizer.watchWindowShortcuts(window))
+
+  if (!bootstrap()) {
+    app.quit()
+    return
+  }
 
   createMainWindow()
 })

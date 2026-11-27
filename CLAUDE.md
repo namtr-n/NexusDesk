@@ -28,7 +28,11 @@ Chủ dự án là người mới học code và học cách làm việc với A
 - BrowserWindow: contextIsolation: true, nodeIntegration: false, sandbox: true, có CSP.
 - preload chỉ expose API có kiểu qua contextBridge (window.nexus.*), không expose ipcRenderer thô.
 - Mọi IPC handler validate input bằng zod, trả { ok: true, data } | { ok: false, error }.
-- Kênh IPC và kiểu dữ liệu định nghĩa một chỗ (shared/ipc-contract.ts).
+- Kênh IPC ở src/shared/channels.ts (không import thư viện); schema zod, kiểu dữ liệu và
+  interface NexusApi ở src/shared/ipc-contract.ts. Preload chỉ được `import type` từ ipc-contract.
+- Thêm kênh IPC mới: channels.ts → ipc-contract.ts (schema + NexusApi) → service → ipc/register.ts → preload.
+- Lỗi được phép hiện cho người dùng thì ném UserError; lỗi khác handler tự ẩn và ghi log.
+- Kiến trúc chi tiết, database và lưu ý môi trường: docs/ARCHITECTURE.md.
 - API key lưu bằng Electron safeStorage. Không log key, không gửi key sang renderer.
 - Không bao giờ ghi đè file gốc của người dùng.
 - Kiểm tra định dạng DOCX (theo quy tắc) và phân tích nội dung (AI) là hai luồng riêng.
@@ -37,6 +41,9 @@ Chủ dự án là người mới học code và học cách làm việc với A
 
 - Không code giả, không dữ liệu mock trong code chạy thật, không nút bấm không có chức năng.
 - Không tạo sẵn file rỗng cho module chưa làm.
-- Sau khi sửa: chạy typecheck, lint, test và báo kết quả thật. Chưa kiểm tra thì không nói "xong".
+- Sau khi sửa: chạy `npm run check` (typecheck + lint + test) và báo kết quả thật.
+  Chưa kiểm tra thì không nói "xong".
+- Máy có Smart App Control: không tắt nó. Nâng cấp vite/electron-vite thì chạy
+  `npx electron-vite build` kiểm tra ngay (xem docs/ARCHITECTURE.md).
 - Commit sau mỗi bước chạy được.
 - Giao diện: dark mode, sidebar trái, nội dung rộng, cảm giác phần mềm desktop.

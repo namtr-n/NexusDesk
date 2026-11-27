@@ -1,4 +1,4 @@
-appId: com.nexusdesk.app
+﻿appId: com.nexusdesk.app
 productName: Nexus Desk
 directories:
   buildResources: build
@@ -9,7 +9,7 @@ files:
   - '!docs/*'
   - '!scripts/*'
   - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{vitest.config.ts,drizzle.config.ts}'
+  - '!{vitest.config.mts,drizzle.config.ts}'
   - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,CHANGELOG.md,README.md,CLAUDE.md}'
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'

@@ -28,5 +28,13 @@ export default defineConfig(
       ...eslintPluginReactRefresh.configs.vite.rules
     }
   },
+  {
+    // Component React và test: để TypeScript tự suy ra kiểu trả về cho gọn.
+    // Main process và preload vẫn phải ghi rõ kiểu trả về.
+    files: ['src/renderer/**/*.{ts,tsx}', 'tests/**/*.ts'],
+    rules: {
+      '@typescript-eslint/explicit-function-return-type': 'off'
+    }
+  },
   eslintConfigPrettier
 )
