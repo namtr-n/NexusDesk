@@ -10,4 +10,15 @@
 | 5   | Kho tài liệu + hỏi đáp RAG có trích nguồn                    | RAG, chống AI bịa                       | ⏳                  |
 | 6   | Dashboard, đóng gói .exe                                     | Build, phát hành                        | ⏳                  |
 
+## Đã thêm ngoài kế hoạch gốc
+
+- Mẫu định dạng (học từ file mẫu của khách / trường), tự sửa định dạng, "Hoàn thiện báo cáo"
+  (sửa định dạng + AI hiệu đính câu chữ bằng Track Changes).
+
+## Định hướng phát triển sau (chưa làm, theo yêu cầu người dùng 27/11/2026)
+
+- Tự chèn mục lục (TOC field của Word), danh mục hình / bảng (gắn style Caption + TOC theo chú thích).
+- Danh mục từ viết tắt (tìm từ viết tắt, AI gợi ý nghĩa đầy đủ, người dùng duyệt lại).
+- Ngắt trang trước mỗi chương, đánh số trang.
+
 Quy trình mỗi giai đoạn: yêu cầu → kế hoạch ngắn → duyệt → làm → giải thích → tự kiểm tra → commit.
