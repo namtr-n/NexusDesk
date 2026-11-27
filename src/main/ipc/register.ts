@@ -4,6 +4,10 @@ import { z } from 'zod'
 import { IPC } from '@shared/channels'
 import {
   activityListSchema,
+  documentIdSchema,
+  documentImportSchema,
+  documentListSchema,
+  documentSetProjectSchema,
   projectCreateSchema,
   projectRemoveSchema,
   projectUpdateSchema,
@@ -12,13 +16,17 @@ import {
 } from '@shared/ipc-contract'
 import { logger } from '../logger'
 import type { ActivityRepository } from '../services/activity/activity-repository'
+import type { DocumentService } from '../services/documents/document-service'
 import type { ProjectService } from '../services/projects/project-service'
 import { createHandler } from './handler'
 
 export interface IpcDependencies {
   projects: ProjectService
   activity: ActivityRepository
+  documents: DocumentService
   appInfo: () => AppInfo
+  /** Hiện hộp thoại chọn file của Windows; trả [] nếu người dùng bấm Hủy */
+  pickDocumentFiles: () => Promise<string[]>
 }
 
 const noInput = z.undefined()
@@ -56,5 +64,18 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
 
   register(IPC.activity.listRecent, activityListSchema, (input) =>
     deps.activity.listRecent(input.limit)
+  )
+
+  // Đường dẫn file do main process tự lấy từ hộp thoại, giao diện không gửi đường dẫn tùy ý.
+  register(IPC.documents.pickAndImport, documentImportSchema, async (input) => {
+    const paths = await deps.pickDocumentFiles()
+    if (paths.length === 0) return { cancelled: true, imported: [], skipped: [] }
+    return deps.documents.importFiles(paths, input.projectId)
+  })
+  register(IPC.documents.list, documentListSchema, (input) => deps.documents.list(input.projectId))
+  register(IPC.documents.get, documentIdSchema, (input) => deps.documents.get(input.id))
+  register(IPC.documents.remove, documentIdSchema, (input) => deps.documents.remove(input.id))
+  register(IPC.documents.setProject, documentSetProjectSchema, (input) =>
+    deps.documents.setProject(input.id, input.projectId)
   )
 }

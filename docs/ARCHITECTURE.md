@@ -52,6 +52,17 @@ Thời gian lưu dạng số mili-giây (`Date.now()`).
 | `projects`     | id, name, description, created_at, updated_at                   | Nhóm tài liệu/prompt theo môn, đồ án |
 | `activity_log` | id, type, message, project_id → projects (set null), created_at | Xóa dự án không xóa nhật ký cũ       |
 
+### Đã có (GĐ 2A)
+
+| Bảng            | Cột chính                                                                                                                                      | Ghi chú                                   |
+| --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| `documents`     | id, project_id, name, kind, size_bytes, sha256, source_path, stored_file, extract_status, extract_message, char_count, page_count, imported_at | Trùng sha256 thì bỏ qua khi nhập          |
+| `document_text` | document_id (cascade), content                                                                                                                 | Chữ trích ra, tách bảng vì có thể rất lớn |
+
+Bản sao tài liệu: `%APPDATA%\Nexus Desk\documents\<uuid>.<kind>`. Xóa tài liệu chỉ xóa bản sao.
+Đường dẫn file do main lấy từ hộp thoại Windows, renderer không bao giờ gửi đường dẫn.
+Kiểm thử tự động khi dev: `NEXUS_E2E_PICK="C:\a.docx|C:\b.pdf"` thay cho hộp thoại (bị bỏ qua khi app.isPackaged).
+
 ### Dự kiến (tạo khi tới giai đoạn tương ứng)
 
 | Bảng                   | GĐ  | Mục đích                                                                |

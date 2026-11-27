@@ -14,5 +14,12 @@ export const IPC = {
   },
   activity: {
     listRecent: 'activity:list-recent'
+  },
+  documents: {
+    pickAndImport: 'documents:pick-and-import',
+    list: 'documents:list',
+    get: 'documents:get',
+    remove: 'documents:remove',
+    setProject: 'documents:set-project'
   }
 } as const

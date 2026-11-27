@@ -16,6 +16,13 @@ const api: NexusApi = {
   },
   activity: {
     listRecent: (input) => ipcRenderer.invoke(IPC.activity.listRecent, input)
+  },
+  documents: {
+    pickAndImport: (input) => ipcRenderer.invoke(IPC.documents.pickAndImport, input),
+    list: (input) => ipcRenderer.invoke(IPC.documents.list, input),
+    get: (input) => ipcRenderer.invoke(IPC.documents.get, input),
+    remove: (input) => ipcRenderer.invoke(IPC.documents.remove, input),
+    setProject: (input) => ipcRenderer.invoke(IPC.documents.setProject, input)
   }
 }
 

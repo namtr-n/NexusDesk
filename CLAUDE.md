@@ -6,11 +6,13 @@ Dữ liệu lưu cục bộ, không có tài khoản người dùng, không có 
 
 ## Người dùng
 
-Chủ dự án là người mới học code và học cách làm việc với AI. Luôn:
+Chủ dự án là sinh viên, chưa rành code, bận rộn. Từ GĐ 2 (27/11/2026) Claude làm toàn quyền:
 
-- Trả lời bằng tiếng Việt, giải thích khái niệm mới bằng lời đơn giản.
-- Ghi khái niệm mới vào docs/SO-TAY-HOC.md sau mỗi giai đoạn.
-- Mỗi giai đoạn: lập kế hoạch ngắn → chờ duyệt → làm → giải thích đã sửa gì → hướng dẫn tự kiểm tra.
+- Tự lập kế hoạch và triển khai, không dừng chờ duyệt từng bước. Người dùng chỉ review app.
+- Xong mỗi mốc dùng được: báo ngắn bằng tiếng Việt (có gì mới, cách thử, còn gì chưa làm).
+- Chỉ dừng hỏi khi cần người dùng thật sự: nhập API key, cài phần mềm lớn, đụng cài đặt bảo mật
+  của máy, hoặc thay đổi phạm vi tính năng.
+- Không cập nhật docs/SO-TAY-HOC.md nữa (giữ làm tư liệu). Vẫn cập nhật docs/ARCHITECTURE.md.
 
 ## Stack (không tự ý thêm công nghệ khác, cần thêm thì hỏi trước)
 

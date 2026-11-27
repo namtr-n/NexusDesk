@@ -1,10 +1,12 @@
-import { app, BrowserWindow, dialog, session } from 'electron'
+import { app, BrowserWindow, dialog, session, type OpenDialogOptions } from 'electron'
+import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { openDatabase } from './db/client'
 import { registerIpcHandlers } from './ipc/register'
 import { getLogFilePath, logger } from './logger'
 import { createActivityRepository } from './services/activity/activity-repository'
+import { createDocumentService } from './services/documents/document-service'
 import { createProjectService } from './services/projects/project-service'
 import { createMainWindow } from './window'
 
@@ -20,6 +22,24 @@ app.on('second-instance', () => {
     win.focus()
   }
 })
+
+async function pickDocumentFiles(): Promise<string[]> {
+  // Chỉ dùng cho kiểm thử tự động khi dev (hộp thoại Windows không tự động hóa được).
+  // Bản cài đặt (.exe) luôn bỏ qua nhánh này.
+  const e2ePick = process.env['NEXUS_E2E_PICK']
+  if (!app.isPackaged && e2ePick) return e2ePick.split('|')
+
+  const options: OpenDialogOptions = {
+    title: 'Chọn tài liệu',
+    properties: ['openFile', 'multiSelections'],
+    filters: [{ name: 'Tài liệu (DOCX, PDF, TXT)', extensions: ['docx', 'pdf', 'txt'] }]
+  }
+  const win = BrowserWindow.getFocusedWindow()
+  const result = win
+    ? await dialog.showOpenDialog(win, options)
+    : await dialog.showOpenDialog(options)
+  return result.canceled ? [] : result.filePaths
+}
 
 /** Mở database, tạo các service và đăng ký IPC. Trả về false nếu thất bại. */
 function bootstrap(): boolean {
@@ -37,9 +57,15 @@ function bootstrap(): boolean {
     const activity = createActivityRepository(database.db)
     const projects = createProjectService(database.db, activity)
 
+    const storageDir = join(dataPath, 'documents')
+    mkdirSync(storageDir, { recursive: true })
+    const documents = createDocumentService({ db: database.db, activity, storageDir, logger })
+
     registerIpcHandlers({
       projects,
       activity,
+      documents,
+      pickDocumentFiles,
       appInfo: () => ({
         version: app.getVersion(),
         dataPath,

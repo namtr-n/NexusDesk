@@ -2,6 +2,7 @@ import { createHashRouter } from 'react-router'
 import { AppLayout } from '@renderer/components/layout/AppLayout'
 import { ComingSoonPage } from '@renderer/pages/ComingSoonPage'
 import { DashboardPage } from '@renderer/pages/Dashboard/DashboardPage'
+import { DocumentsPage } from '@renderer/pages/Documents/DocumentsPage'
 import { SettingsPage } from '@renderer/pages/Settings/SettingsPage'
 
 // Hash router (#/documents...) vì app chạy từ file trên máy, không có web server.
@@ -11,22 +12,7 @@ export const router = createHashRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <DashboardPage /> },
-      {
-        path: 'documents',
-        element: (
-          <ComingSoonPage
-            title="Tài liệu"
-            description="Kiểm tra định dạng báo cáo DOCX và phân tích nội dung."
-            phase={2}
-            features={[
-              'Mở file DOCX, PDF, TXT (file gốc luôn được giữ nguyên)',
-              'Kiểm tra font, cỡ chữ, lề, giãn dòng, heading theo chuẩn báo cáo',
-              'Xuất báo cáo lỗi',
-              'AI nhận xét nội dung, chính tả, văn phong (Giai đoạn 3)'
-            ]}
-          />
-        )
-      },
+      { path: 'documents', element: <DocumentsPage /> },
       {
         path: 'knowledge',
         element: (
