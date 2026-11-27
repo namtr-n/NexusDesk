@@ -3,7 +3,7 @@
 Personal AI Workspace cho Windows: kiểm tra định dạng báo cáo DOCX, phân tích tài liệu bằng AI,
 thư viện prompt và kho tài liệu hỏi đáp.
 
-Trạng thái: Giai đoạn 1 – khung app (chờ nghiệm thu).
+Trạng thái: Giai đoạn 1 xong (khung app, database, quản lý dự án). Tiếp theo: Giai đoạn 2.
 
 ## Lệnh thường dùng
 
