@@ -2,7 +2,7 @@
  * Tiện ích đọc XML giữ nguyên thứ tự phần tử (fast-xml-parser, preserveOrder).
  * Mỗi node có dạng { "w:p": [con...], ":@": { "w:val": "..." } } hoặc { "#text": "..." }.
  */
-import { XMLParser } from 'fast-xml-parser'
+import { XMLBuilder, XMLParser } from 'fast-xml-parser'
 
 export type XNode = Record<string, unknown>
 
@@ -18,6 +18,83 @@ const parser = new XMLParser({
 
 export function parseXml(xml: string): XNode[] {
   return parser.parse(xml) as XNode[]
+}
+
+const builder = new XMLBuilder({
+  preserveOrder: true,
+  ignoreAttributes: false,
+  attributeNamePrefix: '',
+  suppressEmptyNode: true,
+  processEntities: true,
+  format: false
+})
+
+/** Ghi cây XML (dạng preserveOrder) trở lại thành chuỗi */
+export function buildXml(nodes: XNode[]): string {
+  return builder.build(nodes) as string
+}
+
+// ---------- Sửa cây XML ----------
+
+export function setAttr(node: XNode, name: string, value: string): void {
+  const attrs = (node[':@'] as Record<string, string> | undefined) ?? {}
+  attrs[name] = value
+  node[':@'] = attrs
+}
+
+export function removeAttr(node: XNode, name: string): void {
+  const attrs = node[':@'] as Record<string, string> | undefined
+  if (attrs) delete attrs[name]
+}
+
+export function newNode(tag: string, attrs?: Record<string, string>): XNode {
+  const n: XNode = { [tag]: [] }
+  if (attrs) n[':@'] = { ...attrs }
+  return n
+}
+
+function childList(parent: XNode): XNode[] {
+  const tag = tagOf(parent)!
+  if (!Array.isArray(parent[tag])) parent[tag] = []
+  return parent[tag] as XNode[]
+}
+
+/**
+ * Lấy (hoặc tạo) phần tử con, chèn ĐÚNG THỨ TỰ mà chuẩn OOXML yêu cầu
+ * (Word coi file là hỏng nếu thứ tự phần tử sai).
+ */
+export function ensureChild(parent: XNode, tag: string, order: readonly string[]): XNode {
+  const list = childList(parent)
+  const found = list.find((k) => tagOf(k) === tag)
+  if (found) return found
+  const rank = order.indexOf(tag)
+  let at = list.length
+  for (let i = 0; i < list.length; i++) {
+    const r = order.indexOf(tagOf(list[i]) ?? '')
+    if (r > rank) {
+      at = i
+      break
+    }
+  }
+  const created = newNode(tag)
+  list.splice(at, 0, created)
+  return created
+}
+
+/** Lấy (hoặc tạo ở vị trí đầu tiên) phần tử con, ví dụ w:pPr trong w:p, w:rPr trong w:r */
+export function ensureFirstChild(parent: XNode, tag: string): XNode {
+  const list = childList(parent)
+  const found = list.find((k) => tagOf(k) === tag)
+  if (found) return found
+  const created = newNode(tag)
+  list.unshift(created)
+  return created
+}
+
+export function removeChild(parent: XNode, tag: string): void {
+  const list = childList(parent)
+  const i = list.findIndex((k) => tagOf(k) === tag)
+  if (i >= 0) list.splice(i, 1)
 }
 
 export function tagOf(node: XNode): string | undefined {

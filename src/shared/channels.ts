@@ -26,7 +26,8 @@ export const IPC = {
     check: 'format:check',
     getLatest: 'format:get-latest',
     exportReport: 'format:export-report',
-    createTemplateFromDocument: 'format:create-template-from-document'
+    createTemplateFromDocument: 'format:create-template-from-document',
+    autoFix: 'format:auto-fix'
   },
   ai: {
     getStatus: 'ai:get-status',

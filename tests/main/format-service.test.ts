@@ -160,6 +160,25 @@ describe('TemplateService + FormatService', () => {
     expect(await readFile(join(userDir, 'goc.docx'))).toEqual(original)
   })
 
+  it('tự sửa: lưu file mới, thêm vào thư viện, file gốc giữ nguyên', async () => {
+    const id = await importDocx('Bao cao.docx', p(LONG) + SECT_OK)
+    const original = await readFile(join(userDir, 'Bao cao.docx'))
+    expect(format.suggestFixedName(id)).toBe('Bao cao - da sua dinh dang.docx')
+
+    const target = join(root, 'Bao cao - da sua dinh dang.docx')
+    const r = await format.autoFix(id, null, target)
+    expect(r).toMatchObject({ issuesAfter: 0, path: target, remainingRules: [] })
+    expect(r.issuesBefore).toBeGreaterThan(0)
+    expect(r.newDocumentId).not.toBeNull()
+    expect(await readFile(join(userDir, 'Bao cao.docx'))).toEqual(original)
+
+    // Bản đã sửa nằm trong thư viện, kiểm tra lại: 0 lỗi
+    const recheck = await format.check(r.newDocumentId!)
+    expect(recheck.issues).toEqual([])
+
+    await expect(format.autoFix(id, null, join(userDir, 'Bao cao.docx'))).rejects.toThrow(UserError)
+  })
+
   it('xóa tài liệu thì xóa luôn lịch sử kiểm tra', async () => {
     const id = await importDocx('a.docx', p(LONG) + SECT_OK)
     await format.check(id)

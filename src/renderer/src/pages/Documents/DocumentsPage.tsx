@@ -126,6 +126,10 @@ export function DocumentsPage() {
               setSelectedId(null)
               refresh()
             }}
+            onOpenDocument={(docId) => {
+              setSelectedId(docId)
+              refresh()
+            }}
           />
         )}
       </div>

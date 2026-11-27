@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router'
 import {
   FORMAT_RULE_LABELS,
   groupIssues,
+  type AutoFixResult,
   type FormatCheckResult,
   type FormatIssue,
   type ReportFormat
@@ -17,7 +18,14 @@ const PAGE = 20
 
 const loadTemplates = () => unwrap(window.nexus.templates.list())
 
-export function FormatCheckPanel({ documentId }: { documentId: number }) {
+export function FormatCheckPanel({
+  documentId,
+  onOpenDocument
+}: {
+  documentId: number
+  /** Mở một tài liệu khác trong thư viện (ví dụ bản vừa tự sửa) */
+  onOpenDocument: (id: number) => void
+}) {
   const load = useCallback(
     () => unwrap(window.nexus.format.getLatest({ id: documentId })),
     [documentId]
@@ -25,9 +33,10 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
   const latest = useAsyncData(load)
   const templates = useAsyncData(loadTemplates)
   const [result, setResult] = useState<FormatCheckResult | null | undefined>(undefined)
-  const [busy, setBusy] = useState<'check' | 'template' | ReportFormat | null>(null)
+  const [busy, setBusy] = useState<'check' | 'template' | 'fix' | ReportFormat | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState<string | null>(null)
+  const [fixed, setFixed] = useState<AutoFixResult | null>(null)
   const [chosen, setChosen] = useState<number | null>(null)
   const navigate = useNavigate()
 
@@ -49,6 +58,21 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
     setSaved(null)
     try {
       setResult(await unwrap(window.nexus.format.check({ id: documentId, templateId })))
+    } catch (err) {
+      setError(errorMessage(err))
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  async function autoFix() {
+    setBusy('fix')
+    setError(null)
+    setSaved(null)
+    setFixed(null)
+    try {
+      const r = await unwrap(window.nexus.format.autoFix({ documentId, templateId }))
+      if (!r.cancelled && r.result) setFixed(r.result)
     } catch (err) {
       setError(errorMessage(err))
     } finally {
@@ -111,6 +135,16 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
       </div>
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
+        {current && current.issues.length > 0 && (
+          <Button
+            variant="primary"
+            onClick={autoFix}
+            disabled={busy !== null || templateId === null}
+            title="Sửa font, cỡ chữ, giãn dòng, căn lề... theo mẫu và lưu thành file mới"
+          >
+            {busy === 'fix' ? 'Đang sửa…' : 'Tự sửa định dạng'}
+          </Button>
+        )}
         {current && (
           <>
             <Button onClick={() => exportAs('docx')} disabled={busy !== null}>
@@ -145,6 +179,13 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
             Đã lưu báo cáo: <span className="select-text break-all text-muted">{saved}</span>
           </InfoBanner>
         )}
+        {fixed && (
+          <FixResultBanner
+            result={fixed}
+            onClose={() => setFixed(null)}
+            onOpen={fixed.newDocumentId ? () => onOpenDocument(fixed.newDocumentId!) : undefined}
+          />
+        )}
 
         {current === null && !busy && (
           <p className="text-[13px] text-muted">
@@ -154,6 +195,50 @@ export function FormatCheckPanel({ documentId }: { documentId: number }) {
         )}
         {current && <ResultView result={current} />}
       </div>
+    </div>
+  )
+}
+
+function FixResultBanner({
+  result,
+  onClose,
+  onOpen
+}: {
+  result: AutoFixResult
+  onClose: () => void
+  onOpen?: () => void
+}) {
+  const { summary } = result
+  return (
+    <div className="mb-4 rounded-md border border-success/30 bg-success/10 px-4 py-3 text-[13px]">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="font-semibold">
+            Đã tự sửa theo mẫu &quot;{result.templateName}&quot;: {result.issuesBefore} lỗi →{' '}
+            {result.issuesAfter} lỗi
+          </p>
+          <p className="mt-0.5 text-[12px] text-muted">
+            Chỉnh {summary.paragraphsChanged} đoạn, {summary.runsChanged} cụm chữ
+            {summary.sectionsChanged > 0 && `, lề trang ${summary.sectionsChanged} phần`}. File gốc
+            giữ nguyên. Đã lưu:{' '}
+            <span className="select-text break-all text-text/80">{result.path}</span>
+          </p>
+          {result.issuesAfter > 0 && (
+            <p className="mt-1 text-[12px] text-amber-300">
+              Còn lại cần sửa tay:{' '}
+              {result.remainingRules.map((r) => FORMAT_RULE_LABELS[r]).join(', ')}.
+            </p>
+          )}
+        </div>
+        <button type="button" className="shrink-0 text-muted hover:text-text" onClick={onClose}>
+          Đóng
+        </button>
+      </div>
+      {onOpen && (
+        <Button variant="primary" className="mt-2" onClick={onOpen}>
+          Mở bản đã sửa
+        </Button>
+      )}
     </div>
   )
 }

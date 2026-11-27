@@ -187,6 +187,19 @@ export interface FormatCheckResult {
 
 export type ReportFormat = 'docx' | 'md'
 
+export interface AutoFixResult {
+  /** File mới đã lưu */
+  path: string
+  templateName: string
+  summary: { paragraphsChanged: number; runsChanged: number; sectionsChanged: number }
+  issuesBefore: number
+  issuesAfter: number
+  /** Loại lỗi còn lại không tự sửa được (ví dụ thứ tự heading) */
+  remainingRules: FormatRuleId[]
+  /** Bản đã sửa vừa được thêm vào thư viện (null nếu trùng / không thêm được) */
+  newDocumentId: number | null
+}
+
 /** Gom lỗi theo loại, đúng thứ tự trong FORMAT_RULE_LABELS, bỏ loại không có lỗi. */
 export function groupIssues(issues: FormatIssue[]): [FormatRuleId, FormatIssue[]][] {
   const order = Object.keys(FORMAT_RULE_LABELS) as FormatRuleId[]

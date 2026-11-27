@@ -15,9 +15,11 @@ interface Props {
   projects: Project[]
   onChanged: () => void
   onRemoved: () => void
+  /** Chọn một tài liệu khác (ví dụ bản vừa tự sửa) */
+  onOpenDocument: (id: number) => void
 }
 
-export function DocumentDetailPanel({ id, projects, onChanged, onRemoved }: Props) {
+export function DocumentDetailPanel({ id, projects, onChanged, onRemoved, onOpenDocument }: Props) {
   const [version, setVersion] = useState(0)
   const load = useCallback(() => unwrap(window.nexus.documents.get({ id })), [id])
   const state = useAsyncData(load, version)
@@ -143,7 +145,7 @@ export function DocumentDetailPanel({ id, projects, onChanged, onRemoved }: Prop
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {activeTab === 'format' ? (
-          <FormatCheckPanel documentId={doc.id} />
+          <FormatCheckPanel documentId={doc.id} onOpenDocument={onOpenDocument} />
         ) : activeTab === 'ai' ? (
           <AiAnalysisPanel documentId={doc.id} />
         ) : doc.text ? (

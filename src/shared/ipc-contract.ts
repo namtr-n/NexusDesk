@@ -18,6 +18,7 @@ import {
 import {
   templateNameSchema,
   templateSpecSchema,
+  type AutoFixResult,
   type FormatCheckResult,
   type FormatTemplate,
   type FormatTemplateSummary
@@ -85,6 +86,7 @@ export type ActivityType =
   | 'document.imported'
   | 'document.deleted'
   | 'format.checked'
+  | 'format.fixed'
   | 'ai.analyzed'
 
 export interface ActivityEntry {
@@ -164,6 +166,18 @@ export const formatCheckSchema = z.object({
 })
 export type FormatCheckInput = z.input<typeof formatCheckSchema>
 
+export const formatAutoFixSchema = z.object({
+  documentId: entityId,
+  templateId: z.union([entityId, z.null()]).optional()
+})
+export type FormatAutoFixInput = z.input<typeof formatAutoFixSchema>
+
+export interface AutoFixOutcome {
+  /** Người dùng bấm Hủy ở hộp thoại "Lưu thành" */
+  cancelled: boolean
+  result: AutoFixResult | null
+}
+
 // ---------- AI ----------
 
 const requestIdSchema = z.string().regex(/^[A-Za-z0-9-]{8,64}$/, 'Mã yêu cầu không hợp lệ')
@@ -241,6 +255,8 @@ export interface NexusApi {
     exportReport(input: FormatExportInput): Promise<Result<ExportResult>>
     /** Học mẫu định dạng từ một tài liệu DOCX trong thư viện */
     createTemplateFromDocument(input: DocumentIdInput): Promise<Result<FormatTemplate>>
+    /** Tự sửa định dạng theo mẫu → hộp thoại "Lưu thành" → file mới (thêm vào thư viện) */
+    autoFix(input: FormatAutoFixInput): Promise<Result<AutoFixOutcome>>
   }
   ai: {
     getStatus(): Promise<Result<AiStatus>>

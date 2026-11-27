@@ -10,6 +10,7 @@ import {
   documentImportSchema,
   documentListSchema,
   documentSetProjectSchema,
+  formatAutoFixSchema,
   formatCheckSchema,
   formatExportSchema,
   projectCreateSchema,
@@ -113,6 +114,11 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   register(IPC.format.createTemplateFromDocument, documentIdSchema, (input) =>
     deps.format.createTemplateFromDocument(input.id)
   )
+  register(IPC.format.autoFix, formatAutoFixSchema, async ({ documentId, templateId }) => {
+    const target = await deps.pickSavePath(deps.format.suggestFixedName(documentId), 'docx')
+    if (!target) return { cancelled: true, result: null }
+    return { cancelled: false, result: await deps.format.autoFix(documentId, templateId, target) }
+  })
   register(IPC.format.getLatest, documentIdSchema, (input) => deps.format.getLatest(input.id))
   register(IPC.format.exportReport, formatExportSchema, async ({ documentId, format }) => {
     const name = deps.format.suggestReportName(documentId, format)

@@ -50,6 +50,8 @@ export interface DocxRun {
   sizePt: number | undefined
   bold: boolean
   vertAlign: string | undefined
+  /** Node w:r trong cây XML (chỉ dùng khi tự sửa định dạng) */
+  xml?: XNode
 }
 
 export interface DocxParagraph {
@@ -65,11 +67,15 @@ export interface DocxParagraph {
   isList: boolean
   props: ParaProps
   runs: DocxRun[]
+  /** Node w:p trong cây XML */
+  xml?: XNode
 }
 
 export interface DocxSection {
   /** Lề trang theo twips */
   margins: { top?: number; bottom?: number; left?: number; right?: number }
+  /** Node w:sectPr trong cây XML */
+  xml?: XNode
 }
 
 export interface DocxModel {
@@ -216,6 +222,7 @@ const RUN_CONTAINERS = new Set([
 interface RawRun {
   text: string
   rPr: XNode | undefined
+  node: XNode
 }
 
 function runText(run: XNode): string {
@@ -231,7 +238,7 @@ function runText(run: XNode): string {
 function collectRuns(container: XNode, out: RawRun[]): void {
   for (const k of kids(container)) {
     const tag = tagOf(k)
-    if (tag === 'w:r') out.push({ text: runText(k), rPr: child(k, 'w:rPr') })
+    if (tag === 'w:r') out.push({ text: runText(k), rPr: child(k, 'w:rPr'), node: k })
     else if (tag && RUN_CONTAINERS.has(tag)) collectRuns(k, out)
     else if (tag === 'w:sdt') {
       const content = child(k, 'w:sdtContent')
@@ -292,6 +299,18 @@ function headingLevelOf(pPr: ParaProps, styleName: string | undefined): number |
 // ---------- Hàm chính ----------
 
 export async function loadDocx(data: Buffer): Promise<DocxModel> {
+  return (await openDocx(data)).model
+}
+
+export interface OpenedDocx {
+  zip: JSZip
+  /** Cây XML của word/document.xml — sửa trực tiếp rồi ghi lại để tạo file mới */
+  documentTree: XNode[]
+  /** Mỗi đoạn / cụm chữ / section có `xml` trỏ tới node tương ứng trong documentTree */
+  model: DocxModel
+}
+
+export async function openDocx(data: Buffer): Promise<OpenedDocx> {
   const zip = await JSZip.loadAsync(data)
   const read = async (name: string): Promise<XNode[] | undefined> => {
     const file = zip.file(name)
@@ -324,7 +343,7 @@ export async function loadDocx(data: Buffer): Promise<DocxModel> {
 
     const rawRuns: RawRun[] = []
     collectRuns(node, rawRuns)
-    const runs = rawRuns.map(({ text, rPr }) => {
+    const runs = rawRuns.map(({ text, rPr, node: runNode }) => {
       const rStyle = attr(child(rPr, 'w:rStyle'), 'w:val')
       const charChain = styleChain(styles, rStyle)
       const eff = merge(paraRun, ...charChain.map((s) => s.rPr), readRunProps(rPr))
@@ -333,7 +352,8 @@ export async function loadDocx(data: Buffer): Promise<DocxModel> {
         font: resolveFont(eff),
         sizePt: eff.sizeHalfPt !== undefined ? eff.sizeHalfPt / 2 : undefined,
         bold: eff.bold === true,
-        vertAlign: eff.vertAlign
+        vertAlign: eff.vertAlign,
+        xml: runNode
       }
     })
 
@@ -349,7 +369,8 @@ export async function loadDocx(data: Buffer): Promise<DocxModel> {
       inToc: inToc || /^toc\s*\d/i.test(leaf?.name ?? ''),
       isList: props.numbered === true,
       props,
-      runs
+      runs,
+      xml: node
     }
   })
 
@@ -361,9 +382,10 @@ export async function loadDocx(data: Buffer): Promise<DocxModel> {
         bottom: num(attr(m, 'w:bottom')),
         left: num(attr(m, 'w:left')),
         right: num(attr(m, 'w:right'))
-      }
+      },
+      xml: s
     }
   })
 
-  return { paragraphs, sections }
+  return { zip, documentTree: documentXml, model: { paragraphs, sections } }
 }

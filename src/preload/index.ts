@@ -30,7 +30,8 @@ const api: NexusApi = {
     getLatest: (input) => ipcRenderer.invoke(IPC.format.getLatest, input),
     exportReport: (input) => ipcRenderer.invoke(IPC.format.exportReport, input),
     createTemplateFromDocument: (input) =>
-      ipcRenderer.invoke(IPC.format.createTemplateFromDocument, input)
+      ipcRenderer.invoke(IPC.format.createTemplateFromDocument, input),
+    autoFix: (input) => ipcRenderer.invoke(IPC.format.autoFix, input)
   },
   ai: {
     getStatus: () => ipcRenderer.invoke(IPC.ai.getStatus),

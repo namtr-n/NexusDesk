@@ -88,6 +88,11 @@ Kiểm thử tự động khi dev: `NEXUS_E2E_PICK="C:\a.docx|C:\b.pdf"` thay ch
   độ dài chữ); cảnh báo khi < 3 đoạn thân bài, không có heading, hoặc giá trị chiếm < 60%.
 - `template-service.ts`: CRUD mẫu, mặc định, không cho xóa mẫu cuối cùng.
 - `report.ts`: xuất Markdown và DOCX. `format-service.ts`: chặn ghi báo cáo đè file gốc/bản sao.
+- `fix.ts` (tự sửa): `openDocx` giữ cây XML + node của từng đoạn/cụm chữ/section; sửa trực tiếp
+  w:rFonts / w:sz / w:b / w:spacing / w:jc / w:ind / w:pgMar cho chỗ đang SAI (giá trị khoảng →
+  điểm gần nhất), chèn phần tử đúng thứ tự schema OOXML (PPR_ORDER, RPR_ORDER, SECT_ORDER), ghi
+  lại bằng `buildXml`, xuất FILE MỚI rồi tự nhập vào thư viện. Bảng / trang bìa chỉ sửa font;
+  danh sách không đổi thụt dòng; không sửa được thứ tự heading. Đã mở thử kết quả bằng Word thật.
 - Đã thử: file Word 365 thật; tình huống "mẫu khách hàng" (Arial 12, 1,15, H1 căn giữa):
   học đúng, bài làm đúng mẫu 0 lỗi, bài sai mẫu bắt đủ 16 lỗi; báo cáo thật 613 đoạn: 0,12 s.
 - Kiểm thử tự động khi dev: `NEXUS_E2E_SAVE_DIR`, `NEXUS_E2E_PICK_TEMPLATE` thay cho hộp thoại.

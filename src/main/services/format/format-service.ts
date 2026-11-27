@@ -1,7 +1,12 @@
 import { readFile, writeFile } from 'fs/promises'
 import { resolve } from 'path'
 import { desc, eq } from 'drizzle-orm'
-import { templateSpecSchema, type FormatCheckResult, type ReportFormat } from '@shared/format'
+import {
+  templateSpecSchema,
+  type AutoFixResult,
+  type FormatCheckResult,
+  type ReportFormat
+} from '@shared/format'
 import type { AppDatabase } from '../../db/client'
 import { formatChecks } from '../../db/schema'
 import { UserError } from '../../errors'
@@ -10,6 +15,7 @@ import type { ActivityRepository } from '../activity/activity-repository'
 import type { DocumentService } from '../documents/document-service'
 import { checkFormat } from './check'
 import { loadDocx } from './docx-model'
+import { fixDocx } from './fix'
 import { buildMarkdown, buildReportDocx } from './report'
 import type { TemplateService } from './template-service'
 
@@ -23,6 +29,16 @@ export interface FormatService {
   suggestReportName(documentId: number, format: ReportFormat): string
   /** Học mẫu từ một tài liệu DOCX đã có trong thư viện */
   createTemplateFromDocument(documentId: number): ReturnType<TemplateService['createFromDocx']>
+  /**
+   * Tự sửa định dạng theo mẫu, ghi FILE MỚI ra targetPath (không bao giờ ghi đè bản gốc),
+   * rồi thêm file mới vào thư viện (cùng dự án).
+   */
+  autoFix(
+    documentId: number,
+    templateId: number | null | undefined,
+    targetPath: string
+  ): Promise<AutoFixResult>
+  suggestFixedName(documentId: number): string
 }
 
 export interface FormatServiceDeps {
@@ -57,6 +73,18 @@ export function createFormatService(deps: FormatServiceDeps): FormatService {
       spec: spec.data,
       stats: JSON.parse(row.statsJson),
       issues: JSON.parse(row.issuesJson)
+    }
+  }
+
+  /** Không bao giờ ghi đè file gốc hay bản sao làm việc của tài liệu */
+  function assertNotOriginal(documentId: number, targetPath: string): void {
+    const same = (a: string, b: string): boolean =>
+      resolve(a).toLowerCase() === resolve(b).toLowerCase()
+    if (
+      same(targetPath, documents.getSourcePath(documentId)) ||
+      same(targetPath, documents.getStoredPath(documentId))
+    ) {
+      throw new UserError('Không thể lưu đè lên chính tài liệu gốc. Hãy chọn tên file khác.')
     }
   }
 
@@ -124,17 +152,7 @@ export function createFormatService(deps: FormatServiceDeps): FormatService {
       const doc = documents.getSummary(documentId)
       const result = getLatest(documentId)
       if (!result) throw new UserError('Chưa có kết quả kiểm tra. Hãy bấm "Kiểm tra" trước.')
-      // Không bao giờ ghi đè file gốc hay bản sao làm việc của tài liệu
-      const same = (a: string, b: string): boolean =>
-        resolve(a).toLowerCase() === resolve(b).toLowerCase()
-      if (
-        same(targetPath, documents.getSourcePath(documentId)) ||
-        same(targetPath, documents.getStoredPath(documentId))
-      ) {
-        throw new UserError(
-          'Không thể lưu báo cáo đè lên chính tài liệu gốc. Hãy chọn tên file khác.'
-        )
-      }
+      assertNotOriginal(documentId, targetPath)
       const content =
         format === 'md'
           ? Buffer.from(buildMarkdown(doc.name, result), 'utf8')
@@ -151,6 +169,52 @@ export function createFormatService(deps: FormatServiceDeps): FormatService {
     async createTemplateFromDocument(documentId) {
       const { data, name } = await readDocxOf(documentId)
       return templates.createFromDocx(data, name)
+    },
+
+    async autoFix(documentId, templateId, targetPath) {
+      const doc = documents.getSummary(documentId)
+      assertNotOriginal(documentId, targetPath)
+      const template =
+        templateId === undefined || templateId === null
+          ? templates.getDefault()
+          : templates.get(templateId)
+      const { data } = await readDocxOf(documentId)
+
+      let fixed
+      try {
+        fixed = await fixDocx(data, template.spec)
+      } catch (err) {
+        logger.error(`[format] không tự sửa được ${doc.name}`, err)
+        throw new UserError('Không tự sửa được file này (cấu trúc DOCX không đọc được).')
+      }
+      const issuesBefore = checkFormat(await loadDocx(data), template.spec).issues.length
+      const remaining = checkFormat(await loadDocx(fixed.data), template.spec).issues
+
+      await writeFile(targetPath, fixed.data)
+      // Thêm bản đã sửa vào thư viện để kiểm tra / dùng tiếp ngay trong app
+      const imported = await documents.importFiles([targetPath], doc.projectId)
+      const newDocument = imported.imported[0] ?? null
+
+      activity.log({
+        type: 'format.fixed',
+        message: `Tự sửa định dạng "${doc.name}" theo mẫu "${template.name}": ${issuesBefore} → ${remaining.length} lỗi`,
+        projectId: doc.projectId
+      })
+
+      return {
+        path: targetPath,
+        templateName: template.name,
+        summary: fixed.summary,
+        issuesBefore,
+        issuesAfter: remaining.length,
+        remainingRules: [...new Set(remaining.map((i) => i.rule))],
+        newDocumentId: newDocument?.id ?? null
+      }
+    },
+
+    suggestFixedName(documentId) {
+      const base = documents.getSummary(documentId).name.replace(/\.docx$/i, '')
+      return `${base} - da sua dinh dang.docx`
     }
   }
 }
