@@ -68,7 +68,7 @@ Cập nhật lần cuối: 27/11/2026. Bảng giai đoạn chi tiết: docs/KE-H
   mở sẵn ở đó, đổi được trong Cài đặt, nút "Mở thư mục chứa file" sau mỗi lần lưu.
 - GĐ4 Thư viện prompt: trang `/prompts` (tìm FTS5 không dấu, danh mục, tag, dự án, lịch sử phiên
   bản + khôi phục, nhân bản, sao chép), 4 prompt mẫu, chạy prompt trên tài liệu ở ô "Prompt của
-  tôi" (tab Phân tích AI). Đã chạy thật với Gemini. Người dùng chưa review.
+  tôi" (tab Phân tích AI). Người dùng đã thử chạy prompt trên báo cáo: đạt.
 
 **Việc tiếp theo (theo thứ tự):**
 
