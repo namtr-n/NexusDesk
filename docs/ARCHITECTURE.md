@@ -117,6 +117,13 @@ AI (`src/main/services/ai/`):
 - IPC handler nhận `ctx.send` để gửi sự kiện về đúng cửa sổ đã gọi.
 - Giao diện hiện câu trả lời bằng bộ Markdown tự viết (`lib/markdown.ts`), không có HTML thô.
 
+### Thư mục file kết quả
+
+- `services/settings/output-dir.ts`: setting `output.dir` (không có = `Documents\file báo cáo lưu trữ`,
+  tự tạo nếu thiếu). Mọi hộp thoại "Lưu thành" (tự sửa, xuất báo cáo, hoàn thiện) mở sẵn ở đây.
+- Kênh `app:reveal-file` chỉ mở Explorer cho file app vừa lưu trong phiên (danh sách `remember`),
+  renderer không mở được đường dẫn tùy ý.
+
 ### Dự kiến (tạo khi tới giai đoạn tương ứng)
 
 | Bảng                   | GĐ  | Mục đích                                                 |

@@ -49,3 +49,47 @@ Chủ dự án là sinh viên, chưa rành code, bận rộn. Từ GĐ 2 (27/11/
   `npx electron-vite build` kiểm tra ngay (xem docs/ARCHITECTURE.md).
 - Commit sau mỗi bước chạy được.
 - Giao diện: dark mode, sidebar trái, nội dung rộng, cảm giác phần mềm desktop.
+
+## Tiến độ (cập nhật mỗi khi xong một mốc, để làm tiếp sau khi nén hội thoại)
+
+Cập nhật lần cuối: 27/11/2026. Bảng giai đoạn chi tiết: docs/KE-HOACH.md.
+
+**Đã xong, đã kiểm thử (130 test xanh):**
+
+- GĐ0–2: khung app, IPC an toàn, dự án, tài liệu (PDF/DOCX/TXT/MD), kiểm tra định dạng DOCX,
+  xuất báo cáo lỗi.
+- Mẫu định dạng: học từ file mẫu của khách/trường, sửa tay, đặt mặc định.
+- Tự sửa định dạng theo mẫu → lưu bản sao (không đụng file gốc).
+- GĐ3 Gemini: nhận xét nội dung (stream), chọn model Tự động / Cố định (người dùng đang để cố định
+  gemini-3.6-flash), dự phòng khi 503/429/timeout. Người dùng đã thử với key thật: chạy được.
+- Hoàn thiện báo cáo: sửa định dạng + AI hiệu đính câu chữ, ghi bằng Track Changes
+  (author "Nexus Desk AI"). Người dùng đã thử trong Word, đạt.
+- Thư mục kết quả: mặc định `Tài liệu\file báo cáo lưu trữ` (người dùng đã tự tạo), hộp thoại Lưu
+  mở sẵn ở đó, đổi được trong Cài đặt, nút "Mở thư mục chứa file" sau mỗi lần lưu.
+
+**Việc tiếp theo (theo thứ tự):**
+
+1. GĐ4 Thư viện prompt: người dùng tự viết/lưu yêu cầu cho AI, dùng khi phân tích tài liệu.
+2. GĐ5 Kho tài liệu + hỏi đáp RAG có trích nguồn (FTS5 trước, chưa dùng embedding).
+3. GĐ6 Dashboard thống kê (trang Tổng quan hiện chỉ có dự án + hoạt động gần đây), đóng gói .exe.
+
+Chỉ là định hướng, CHƯA làm khi người dùng chưa yêu cầu: mục lục, danh mục hình/bảng, từ viết tắt,
+ngắt trang, đánh số trang (ghi ở docs/KE-HOACH.md).
+
+**Dữ liệu và thói quen của người dùng:**
+
+- File đầu vào (file của họ, mẫu của khách) nằm trong Downloads: chỉ đọc, không sửa, không di chuyển.
+- Không xóa DB thật ở `%APPDATA%\Nexus Desk`. Dữ liệu thử do Claude tạo thì xóa qua API của app.
+- API key do người dùng tự nhập trong Cài đặt. Không hỏi, không xem, không log key.
+
+**Lưu ý môi trường khi làm (máy Windows này):**
+
+- Mỗi lệnh PowerShell mới phải nạp lại PATH trước (không thì không thấy git/node):
+  `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`
+- Không dùng Get-Content/Set-Content để sửa file có tiếng Việt (hỏng mã hóa); dùng công cụ Edit/Write.
+  File .ps1 có tiếng Việt cần BOM. Commit message tiếng Việt: viết ra file (không BOM) rồi `git commit -F`.
+- Trước khi chạy app: tắt hết tiến trình electron cũ (khóa single-instance).
+- Thử UI tự động: `electron-vite dev --remoteDebuggingPort 9333` + script CDP; hook E2E
+  (NEXUS_E2E_PICK, NEXUS_E2E_SAVE_DIR, NEXUS_E2E_PICK_TEMPLATE) chỉ chạy khi chưa đóng gói.
+  Xong phải mở lại app bình thường, không còn biến E2E (người dùng hay dùng chung cửa sổ đó).
+- Word COM (tạo/kiểm file DOCX thật) chạy trong Start-Job có timeout, không sửa style khi Word ẩn.

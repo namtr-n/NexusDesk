@@ -1,19 +1,21 @@
 # Kế hoạch Nexus Desk 1.0
 
-| GĐ  | Nội dung                                                     | Học được                                | Trạng thái          |
-| --- | ------------------------------------------------------------ | --------------------------------------- | ------------------- |
-| 0   | Cài Node.js, Git, tạo project                                | Terminal, Git, commit                   | ✅ Xong             |
-| 1   | Khung app: cửa sổ, sidebar, dark mode, database, IPC an toàn | Duyệt kế hoạch của AI, cấu trúc project | ✅ Xong             |
-| 2   | Kiểm tra định dạng báo cáo DOCX theo chuẩn, xuất báo cáo lỗi | Test, đọc diff, code review             | ✅ Xong             |
-| 3   | Tích hợp Gemini: nhận xét nội dung, chính tả, văn phong      | API key, prompt, token, chi phí         | 🧪 Chờ thử key thật |
-| 4   | Thư viện prompt (người dùng tự viết yêu cầu)                 | Viết yêu cầu cho AI                     | ⏳                  |
-| 5   | Kho tài liệu + hỏi đáp RAG có trích nguồn                    | RAG, chống AI bịa                       | ⏳                  |
-| 6   | Dashboard, đóng gói .exe                                     | Build, phát hành                        | ⏳                  |
+| GĐ  | Nội dung                                                     | Học được                                | Trạng thái |
+| --- | ------------------------------------------------------------ | --------------------------------------- | ---------- |
+| 0   | Cài Node.js, Git, tạo project                                | Terminal, Git, commit                   | ✅ Xong    |
+| 1   | Khung app: cửa sổ, sidebar, dark mode, database, IPC an toàn | Duyệt kế hoạch của AI, cấu trúc project | ✅ Xong    |
+| 2   | Kiểm tra định dạng báo cáo DOCX theo chuẩn, xuất báo cáo lỗi | Test, đọc diff, code review             | ✅ Xong    |
+| 3   | Tích hợp Gemini: nhận xét nội dung, chính tả, văn phong      | API key, prompt, token, chi phí         | ✅ Xong    |
+| 4   | Thư viện prompt (người dùng tự viết yêu cầu)                 | Viết yêu cầu cho AI                     | ⏳         |
+| 5   | Kho tài liệu + hỏi đáp RAG có trích nguồn                    | RAG, chống AI bịa                       | ⏳         |
+| 6   | Dashboard, đóng gói .exe                                     | Build, phát hành                        | ⏳         |
 
 ## Đã thêm ngoài kế hoạch gốc
 
 - Mẫu định dạng (học từ file mẫu của khách / trường), tự sửa định dạng, "Hoàn thiện báo cáo"
   (sửa định dạng + AI hiệu đính câu chữ bằng Track Changes).
+- Chọn model AI: Tự động (dò model khỏe) hoặc Cố định.
+- Thư mục lưu file kết quả mặc định + nút mở thư mục.
 
 ## Định hướng phát triển sau (chưa làm, theo yêu cầu người dùng 27/11/2026)
 
