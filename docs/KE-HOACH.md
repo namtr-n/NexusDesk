@@ -22,5 +22,13 @@
 - Tự chèn mục lục (TOC field của Word), danh mục hình / bảng (gắn style Caption + TOC theo chú thích).
 - Danh mục từ viết tắt (tìm từ viết tắt, AI gợi ý nghĩa đầy đủ, người dùng duyệt lại).
 - Ngắt trang trước mỗi chương, đánh số trang.
+- Kiểm tra tài liệu tham khảo theo chuẩn (APA / IEEE). Sửa hàng loạt nhiều file. Tự cập nhật app.
+  (Người dùng chốt 27/11/2026.)
+- Kiểm tra trùng lặp nội bộ (làm sau GĐ5, dùng lại kho tài liệu + chỉ mục tìm kiếm): so báo cáo
+  với các tài liệu đã nạp vào app, chỉ ra đoạn giống, tỉ lệ giống, giống với file nào. Chạy trên máy,
+  miễn phí. Không so với Internet, không dò văn AI. (Người dùng chốt 27/11/2026.)
+
+Đã cân nhắc và BỎ (27/11/2026): xoay vòng nhiều API key (rủi ro điều khoản Google; người dùng sẽ
+trả phí cho một key), kiểm tra đạo văn / dò văn AI qua dịch vụ trả phí (Turnitin không có API cá nhân).
 
 Quy trình mỗi giai đoạn: yêu cầu → kế hoạch ngắn → duyệt → làm → giải thích → tự kiểm tra → commit.
