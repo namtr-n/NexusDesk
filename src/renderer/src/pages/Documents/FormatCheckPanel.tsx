@@ -9,6 +9,7 @@ import {
   type ReportFormat
 } from '@shared/format'
 import { Button, ErrorBanner, InfoBanner, Loading, Select } from '@renderer/components/ui'
+import { RevealButton } from '@renderer/components/RevealButton'
 import { useAsyncData } from '@renderer/hooks/useAsyncData'
 import { errorMessage, unwrap } from '@renderer/lib/api'
 import { formatDateTime } from '@renderer/lib/format'
@@ -177,6 +178,9 @@ export function FormatCheckPanel({
         {saved && (
           <InfoBanner onClose={() => setSaved(null)}>
             Đã lưu báo cáo: <span className="select-text break-all text-muted">{saved}</span>
+            <span className="ml-2">
+              <RevealButton path={saved} />
+            </span>
           </InfoBanner>
         )}
         {fixed && (
@@ -221,7 +225,8 @@ function FixResultBanner({
             Chỉnh {summary.paragraphsChanged} đoạn, {summary.runsChanged} cụm chữ
             {summary.sectionsChanged > 0 && `, lề trang ${summary.sectionsChanged} phần`}. File gốc
             giữ nguyên. Đã lưu:{' '}
-            <span className="select-text break-all text-text/80">{result.path}</span>
+            <span className="select-text break-all text-text/80">{result.path}</span>{' '}
+            <RevealButton path={result.path} />
           </p>
           {result.issuesAfter > 0 && (
             <p className="mt-1 text-[12px] text-amber-300">

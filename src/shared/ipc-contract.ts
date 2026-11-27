@@ -217,6 +217,17 @@ export interface TemplateFromFileResult {
   template: FormatTemplate | null
 }
 
+// ---------- Thư mục kết quả ----------
+
+export interface OutputDirInfo {
+  path: string
+  /** Đang dùng thư mục mặc định (Tài liệu\file báo cáo lưu trữ) */
+  isDefault: boolean
+}
+
+export const revealFileSchema = z.object({ path: z.string().min(1).max(1000) })
+export type RevealFileInput = z.input<typeof revealFileSchema>
+
 // ---------- Thông tin app ----------
 
 export interface AppInfo {
@@ -231,6 +242,14 @@ export interface AppInfo {
 export interface NexusApi {
   app: {
     getInfo(): Promise<Result<AppInfo>>
+    /** Thư mục lưu file kết quả (bản đã sửa, bản hoàn thiện, báo cáo lỗi) */
+    getOutputDir(): Promise<Result<OutputDirInfo>>
+    /** Hộp thoại chọn thư mục (do main hiện) */
+    chooseOutputDir(): Promise<Result<OutputDirInfo>>
+    resetOutputDir(): Promise<Result<OutputDirInfo>>
+    openOutputDir(): Promise<Result<void>>
+    /** Mở File Explorer chọn sẵn file kết quả app vừa lưu */
+    revealFile(input: RevealFileInput): Promise<Result<void>>
   }
   projects: {
     list(): Promise<Result<Project[]>>

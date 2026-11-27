@@ -8,6 +8,7 @@ import {
   type PolishResult
 } from '@shared/polish'
 import { Button, ErrorBanner, Loading, Select } from '@renderer/components/ui'
+import { RevealButton } from '@renderer/components/RevealButton'
 import { useAsyncData } from '@renderer/hooks/useAsyncData'
 import { errorMessage, unwrap } from '@renderer/lib/api'
 
@@ -222,7 +223,8 @@ function ResultView({ result, onOpen }: { result: PolishResult; onOpen: (id: num
             model {result.model}
           </li>
           <li>
-            Đã lưu: <span className="select-text break-all text-text/80">{result.path}</span>
+            Đã lưu: <span className="select-text break-all text-text/80">{result.path}</span>{' '}
+            <RevealButton path={result.path} />
           </li>
         </ul>
         <p className="mt-2 text-[12px]">

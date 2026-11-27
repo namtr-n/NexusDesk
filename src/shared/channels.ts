@@ -4,7 +4,12 @@
  */
 export const IPC = {
   app: {
-    getInfo: 'app:get-info'
+    getInfo: 'app:get-info',
+    getOutputDir: 'app:get-output-dir',
+    chooseOutputDir: 'app:choose-output-dir',
+    resetOutputDir: 'app:reset-output-dir',
+    openOutputDir: 'app:open-output-dir',
+    revealFile: 'app:reveal-file'
   },
   projects: {
     list: 'projects:list',

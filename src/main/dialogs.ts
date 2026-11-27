@@ -50,6 +50,19 @@ export async function pickTemplateFile(): Promise<string | null> {
   return result.canceled ? null : (result.filePaths[0] ?? null)
 }
 
+export async function pickFolder(title: string, defaultPath: string): Promise<string | null> {
+  const options: OpenDialogOptions = {
+    title,
+    defaultPath,
+    properties: ['openDirectory', 'createDirectory']
+  }
+  const win = BrowserWindow.getFocusedWindow()
+  const result = win
+    ? await dialog.showOpenDialog(win, options)
+    : await dialog.showOpenDialog(options)
+  return result.canceled ? null : (result.filePaths[0] ?? null)
+}
+
 const SAVE_FILTERS: Record<ReportFormat, { name: string; extensions: string[] }> = {
   docx: { name: 'Word (DOCX)', extensions: ['docx'] },
   md: { name: 'Markdown', extensions: ['md'] }
@@ -57,14 +70,15 @@ const SAVE_FILTERS: Record<ReportFormat, { name: string; extensions: string[] }>
 
 export async function pickSavePath(
   defaultName: string,
-  format: ReportFormat
+  format: ReportFormat,
+  defaultDir: string = app.getPath('documents')
 ): Promise<string | null> {
   const fakeDir = e2e('NEXUS_E2E_SAVE_DIR')
   if (fakeDir) return join(fakeDir, defaultName)
 
   const options: SaveDialogOptions = {
-    title: 'Lưu báo cáo',
-    defaultPath: join(app.getPath('documents'), defaultName),
+    title: 'Lưu file kết quả',
+    defaultPath: join(defaultDir, defaultName),
     filters: [SAVE_FILTERS[format]]
   }
   const win = BrowserWindow.getFocusedWindow()

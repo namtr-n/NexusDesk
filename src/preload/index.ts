@@ -8,7 +8,12 @@ import type { NexusApi } from '@shared/ipc-contract'
 // Chỉ mở đúng những hàm dưới đây qua window.nexus, không bao giờ mở ipcRenderer thô.
 const api: NexusApi = {
   app: {
-    getInfo: () => ipcRenderer.invoke(IPC.app.getInfo)
+    getInfo: () => ipcRenderer.invoke(IPC.app.getInfo),
+    getOutputDir: () => ipcRenderer.invoke(IPC.app.getOutputDir),
+    chooseOutputDir: () => ipcRenderer.invoke(IPC.app.chooseOutputDir),
+    resetOutputDir: () => ipcRenderer.invoke(IPC.app.resetOutputDir),
+    openOutputDir: () => ipcRenderer.invoke(IPC.app.openOutputDir),
+    revealFile: (input) => ipcRenderer.invoke(IPC.app.revealFile, input)
   },
   projects: {
     list: () => ipcRenderer.invoke(IPC.projects.list),

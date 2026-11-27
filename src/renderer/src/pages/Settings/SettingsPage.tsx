@@ -3,6 +3,7 @@ import { SettingsIcon } from '@renderer/components/icons'
 import { useAsyncData } from '@renderer/hooks/useAsyncData'
 import { unwrap } from '@renderer/lib/api'
 import { AiSettingsPanel } from './AiSettingsPanel'
+import { OutputDirPanel } from './OutputDirPanel'
 
 const loadInfo = () => unwrap(window.nexus.app.getInfo())
 
@@ -26,6 +27,7 @@ export function SettingsPage() {
       />
       <div className="space-y-5">
         <AiSettingsPanel />
+        <OutputDirPanel />
         <Panel title="Ứng dụng" icon={<SettingsIcon />}>
           {info.status === 'loading' && <Loading />}
           {info.status === 'error' && <ErrorBanner message={info.error} />}

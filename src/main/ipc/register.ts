@@ -23,6 +23,7 @@ import {
   aiCancelSchema,
   aiSetKeySchema,
   aiSetModelSchema,
+  revealFileSchema,
   type AppInfo,
   type Result
 } from '@shared/ipc-contract'
@@ -37,6 +38,8 @@ import type { DocumentService } from '../services/documents/document-service'
 import type { FormatService } from '../services/format/format-service'
 import type { TemplateService } from '../services/format/template-service'
 import type { ProjectService } from '../services/projects/project-service'
+import type { OutputDirService } from '../services/settings/output-dir'
+import { UserError } from '../errors'
 import { createHandler, type HandlerContext } from './handler'
 
 export interface IpcDependencies {
@@ -52,8 +55,19 @@ export interface IpcDependencies {
   pickDocumentFiles: () => Promise<string[]>
   /** Hộp thoại chọn MỘT file DOCX mẫu; trả null nếu người dùng bấm Hủy */
   pickTemplateFile: () => Promise<string | null>
-  /** Hiện hộp thoại "Lưu thành"; trả null nếu người dùng bấm Hủy */
-  pickSavePath: (defaultName: string, format: ReportFormat) => Promise<string | null>
+  /** Hiện hộp thoại "Lưu thành" mở sẵn ở defaultDir; trả null nếu người dùng bấm Hủy */
+  pickSavePath: (
+    defaultName: string,
+    format: ReportFormat,
+    defaultDir?: string
+  ) => Promise<string | null>
+  /** Thư mục lưu file kết quả */
+  outputDir: OutputDirService
+  pickFolder: (title: string, defaultPath: string) => Promise<string | null>
+  /** Mở thư mục bằng File Explorer */
+  openFolder: (path: string) => Promise<void>
+  /** Mở File Explorer và chọn sẵn file */
+  revealFile: (path: string) => void
 }
 
 const noInput = z.undefined()
@@ -87,7 +101,34 @@ function register<S extends z.ZodType, R>(
 }
 
 export function registerIpcHandlers(deps: IpcDependencies): void {
+  /** Hộp thoại "Lưu thành" mở sẵn ở thư mục kết quả; ghi nhận file để sau này "mở thư mục chứa" */
+  async function pickOutput(name: string, format: ReportFormat): Promise<string | null> {
+    const target = await deps.pickSavePath(name, format, deps.outputDir.get())
+    if (target) deps.outputDir.remember(target)
+    return target
+  }
+  const outputDirInfo = (): { path: string; isDefault: boolean } => ({
+    path: deps.outputDir.get(),
+    isDefault: deps.outputDir.isDefault()
+  })
+
   register(IPC.app.getInfo, noInput, () => deps.appInfo())
+  register(IPC.app.getOutputDir, noInput, () => outputDirInfo())
+  register(IPC.app.chooseOutputDir, noInput, async () => {
+    const dir = await deps.pickFolder('Chọn thư mục lưu file kết quả', deps.outputDir.get())
+    if (dir) deps.outputDir.set(dir)
+    return outputDirInfo()
+  })
+  register(IPC.app.resetOutputDir, noInput, () => {
+    deps.outputDir.reset()
+    return outputDirInfo()
+  })
+  register(IPC.app.openOutputDir, noInput, () => deps.openFolder(deps.outputDir.get()))
+  register(IPC.app.revealFile, revealFileSchema, ({ path }) => {
+    // Chỉ mở được file chính app vừa lưu (không cho giao diện mở đường dẫn tùy ý)
+    if (!deps.outputDir.isKnownOutput(path)) throw new UserError('Không tìm thấy file.')
+    deps.revealFile(path)
+  })
 
   register(IPC.projects.list, noInput, () => deps.projects.list())
   register(IPC.projects.create, projectCreateSchema, (input) => deps.projects.create(input))
@@ -118,14 +159,14 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
     deps.format.createTemplateFromDocument(input.id)
   )
   register(IPC.format.autoFix, formatAutoFixSchema, async ({ documentId, templateId }) => {
-    const target = await deps.pickSavePath(deps.format.suggestFixedName(documentId), 'docx')
+    const target = await pickOutput(deps.format.suggestFixedName(documentId), 'docx')
     if (!target) return { cancelled: true, result: null }
     return { cancelled: false, result: await deps.format.autoFix(documentId, templateId, target) }
   })
   register(IPC.format.getLatest, documentIdSchema, (input) => deps.format.getLatest(input.id))
   register(IPC.format.exportReport, formatExportSchema, async ({ documentId, format }) => {
     const name = deps.format.suggestReportName(documentId, format)
-    const target = await deps.pickSavePath(name, format)
+    const target = await pickOutput(name, format)
     if (!target) return { cancelled: true, path: null }
     const path = await deps.format.exportReport(documentId, format, target)
     return { cancelled: false, path }
@@ -165,7 +206,7 @@ export function registerIpcHandlers(deps: IpcDependencies): void {
   register(IPC.ai.cancel, aiCancelSchema, (input) => deps.ai.cancel(input.requestId))
 
   register(IPC.polish.run, polishRunSchema, async (input, ctx) => {
-    const target = await deps.pickSavePath(deps.polish.suggestName(input.documentId), 'docx')
+    const target = await pickOutput(deps.polish.suggestName(input.documentId), 'docx')
     if (!target) return { cancelled: true, result: null }
     const result = await deps.polish.run(input, target, (event: PolishProgressEvent) =>
       ctx.send(IPC.polish.progressEvent, event)

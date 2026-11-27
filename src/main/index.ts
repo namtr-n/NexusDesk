@@ -1,9 +1,11 @@
-import { app, BrowserWindow, dialog, safeStorage, session } from 'electron'
+import { app, BrowserWindow, dialog, safeStorage, session, shell } from 'electron'
 import { mkdirSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { openDatabase } from './db/client'
-import { pickDocumentFiles, pickSavePath, pickTemplateFile } from './dialogs'
+import { pickDocumentFiles, pickFolder, pickSavePath, pickTemplateFile } from './dialogs'
+import { UserError } from './errors'
+import { createOutputDirService } from './services/settings/output-dir'
 import { registerIpcHandlers } from './ipc/register'
 import { getLogFilePath, logger } from './logger'
 import { createActivityRepository } from './services/activity/activity-repository'
@@ -84,6 +86,13 @@ function bootstrap(): boolean {
       pickDocumentFiles,
       pickTemplateFile,
       pickSavePath,
+      outputDir: createOutputDirService(settings, app.getPath('documents')),
+      pickFolder,
+      openFolder: async (dir) => {
+        const error = await shell.openPath(dir)
+        if (error) throw new UserError(`Không mở được thư mục: ${error}`)
+      },
+      revealFile: (file) => shell.showItemInFolder(file),
       appInfo: () => ({
         version: app.getVersion(),
         dataPath,
