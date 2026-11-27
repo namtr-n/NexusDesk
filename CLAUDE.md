@@ -93,3 +93,6 @@ ngắt trang, đánh số trang (ghi ở docs/KE-HOACH.md).
   (NEXUS_E2E_PICK, NEXUS_E2E_SAVE_DIR, NEXUS_E2E_PICK_TEMPLATE) chỉ chạy khi chưa đóng gói.
   Xong phải mở lại app bình thường, không còn biến E2E (người dùng hay dùng chung cửa sổ đó).
 - Word COM (tạo/kiểm file DOCX thật) chạy trong Start-Job có timeout, không sửa style khi Word ẩn.
+- GitHub: repo riêng tư github.com/namtr-n/NexusDesk. Git HTTPS bị Smart App Control chặn (libcurl
+  chưa ký) → push qua SSH (`core.sshCommand` = OpenSSH của Windows, key `~/.ssh/id_ed25519`).
+  Commit xong thì `git push`.
