@@ -19,12 +19,32 @@ export const AI_TASK_INFO: Record<AiTask, { label: string; description: string }
   }
 }
 
+/**
+ * Làm sạch key người dùng dán vào: bỏ khoảng trắng / xuống dòng, dấu ngoặc bao quanh,
+ * tiền tố kiểu `GEMINI_API_KEY=` hay `Bearer `. Không ép định dạng cụ thể vì Google có thể
+ * đổi định dạng key — đúng/sai do chính Gemini kiểm tra (nút "Kiểm tra kết nối").
+ */
+export function cleanApiKey(raw: string): string {
+  let k = raw.replace(/\s+/g, '')
+  k = k.replace(/^(export)?[A-Z_]*API_?KEY[=:]/i, '')
+  k = k.replace(/^Bearer/i, '')
+  k = k.replace(/^["'`]+|["'`,;]+$/g, '')
+  return k
+}
+
 export const apiKeySchema = z
   .string('API key phải là chữ')
-  .trim()
-  .min(20, 'API key quá ngắn — hãy dán đầy đủ key')
-  .max(200, 'API key quá dài')
-  .regex(/^[A-Za-z0-9_-]+$/, 'API key chỉ gồm chữ, số, dấu - và _ (không có khoảng trắng)')
+  .transform(cleanApiKey)
+  .pipe(
+    z
+      .string()
+      .min(20, 'API key quá ngắn — hãy dán đầy đủ key')
+      .max(300, 'API key quá dài — có thể đã dán nhầm cả đoạn văn bản')
+      .regex(
+        /^[\x21-\x7E]+$/,
+        'API key có ký tự lạ (chữ có dấu hoặc ký tự đặc biệt). Hãy copy lại key.'
+      )
+  )
 
 export const modelIdSchema = z
   .string()
