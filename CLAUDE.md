@@ -62,7 +62,7 @@ làm hộ. Vẫn tự code toàn quyền, nhưng giao tiếp theo kiểu đối 
 
 ## Tiến độ (cập nhật mỗi khi xong một mốc, để làm tiếp sau khi nén hội thoại)
 
-Cập nhật lần cuối: 27/11/2026. Bảng giai đoạn chi tiết: docs/KE-HOACH.md.
+Cập nhật lần cuối: 28/11/2026. Bảng giai đoạn chi tiết: docs/KE-HOACH.md.
 
 **Đã xong, đã kiểm thử (139 test xanh):**
 
@@ -80,13 +80,10 @@ Cập nhật lần cuối: 27/11/2026. Bảng giai đoạn chi tiết: docs/KE-H
   bản + khôi phục, nhân bản, sao chép), 4 prompt mẫu, chạy prompt trên tài liệu ở ô "Prompt của
   tôi" (tab Phân tích AI). Người dùng đã thử chạy prompt trên báo cáo: đạt.
 
-**Việc tiếp theo (theo thứ tự):**
-
-1. GĐ5 Kho tài liệu + hỏi đáp RAG có trích nguồn (FTS5 trước, chưa dùng embedding).
-2. GĐ6 Dashboard thống kê (trang Tổng quan hiện chỉ có dự án + hoạt động gần đây), đóng gói .exe.
-
-Chỉ là định hướng, CHƯA làm khi người dùng chưa yêu cầu: mục lục, danh mục hình/bảng, từ viết tắt,
-ngắt trang, đánh số trang (ghi ở docs/KE-HOACH.md).
+**Phạm vi đã chốt (28/11/2026): DỪNG phát triển tính năng.** App dùng cá nhân cho báo cáo của
+người dùng, bản hiện tại đủ dùng. Không làm GĐ5, GĐ6 hay các ý tưởng trong docs/KE-HOACH.md.
+Chỉ sửa lỗi / chỉnh nhỏ khi người dùng yêu cầu (vẫn qua nhánh + PR). Nếu người dùng muốn làm
+tính năng mới thì nhắc lại quyết định này và hỏi chắc trước khi bắt đầu.
 
 **Dữ liệu và thói quen của người dùng:**
 
